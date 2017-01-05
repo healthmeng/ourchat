@@ -30,7 +30,7 @@ type MsgInfo struct{ // one table for each user
 }
 
 var dbdrv string="mysql"
-var dblogin string="work@abcd1234@tcp(127.0.0.1:3306)/chat"
+var dblogin string="work:abcd1234@tcp(127.0.0.1:3306)/chat"
 
 func FindUser(username string) (* UserInfo,error){
 	db,err:=sql.Open(dbdrv,dblogin)
@@ -39,7 +39,7 @@ func FindUser(username string) (* UserInfo,error){
 		return nil,err
 	}
 	defer db.Close()
-	query:="select * from users where username="+username
+	query:=fmt.Sprintf("select * from users where username='%s'",username)
 	res,err:=db.Query(query)
 	if err!=nil{
 		fmt.Println("find user query error:",err)
@@ -78,7 +78,7 @@ func AddUser(info *UserInfo) error{
 		return err
 	}else{
 		info.UID ,_= result.LastInsertId()
-		query=fmt.Sprintf("create table `msg%d` (`msgid` int(11) not null AUTO_INCREMENT, `type` smallint(3) not null, `content` varchar(1024), `touid` int(11) not null, `arrived` tinyint(1) not null, `svrstamp` datetime",info.UID)
+		query=fmt.Sprintf("create table `msg%d` (`msgid` int(11) not null AUTO_INCREMENT, `type` smallint(3) not null, `content` varchar(1024), `touid` int(11) not null, `arrived` tinyint(1) not null, `svrstamp` datetime, PRIMARY KEY(`msgid`))",info.UID)
 		if _,err:=db.Exec(query);err!=nil{
 			log.Println("Create msg table error:",err)
 			return err
