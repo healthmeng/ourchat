@@ -14,7 +14,7 @@ import (
 var svraddr string = "127.0.0.1"
 //var svraddr string = "123.206.55.31"
 var svrport string = ":2048"
-
+var connstr string=""
 
 type UserInfo struct{
 	UID int64
@@ -52,7 +52,7 @@ func doRegister(){
 		info.Password+=fmt.Sprintf("%02x",sha[i])
 	}
 
-	conn,err:=net.Dial("tcp",svraddr+svrport)
+	conn,err:=net.Dial("tcp",connstr)
 	if err!=nil{
 		fmt.Println("Connect to server failed")
 		return
@@ -92,7 +92,7 @@ func doDel(){
 		info.Password+=fmt.Sprintf("%02x",sha[i])
 	}
 
-	conn,err:=net.Dial("tcp",svraddr+svrport)
+	conn,err:=net.Dial("tcp",connstr)
 	if err!=nil{
 		fmt.Println("Connect to server failed")
 		return
@@ -113,11 +113,22 @@ func doDel(){
 func doLogin(){
 }
 
+func initsvr(){
+	if file,err:=os.Open("clt.ini");err==nil{
+		if _,err:=fmt.Fscan(file,&connstr);err==nil{
+			return
+		}
+	}
+	connstr=svraddr+svrport
+	fmt.Println(connstr)
+}
+
 func main(){
 	if len(os.Args)==1{
 		fmt.Println("client register(reg)\nclient del\nclient login")
 		return
 	}
+	initsvr()
 	if os.Args[1]=="reg" || os.Args[1]=="register"{
 		doRegister()
 	} else if os.Args[1]=="del" {
