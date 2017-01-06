@@ -7,7 +7,7 @@ import(
 "bufio"
 "time"
 "dbop"
-"encoding/json"
+//"encoding/json"
 )
 
 var online_user map[string] chan int
@@ -23,16 +23,20 @@ func procConn(conn net.Conn){
 	}
 	switch string(command){
 		case "AddUser":// register
-			buf,_,err:=rd.ReadLine()
-			if err!=nil{
-				log.Println("Read user register info error:",err)
-				return
-			}
 			user:=new(dbop.UserInfo)
-			if err:=json.Unmarshal(buf,user);err!=nil{
-				log.Println("Resolve user info error:",err)
+			if buf,_,err:=rd.ReadLine();err!=nil{
+				log.Println("Read user register user error:",err)
 				return
+			}else{
+				user.Username=string(buf)
 			}
+			if buf,_,err:=rd.ReadLine();err!=nil{
+				log.Println("Read user register password error:",err)
+				return
+			}else{
+				user.Password=string(buf)
+			}
+
 			if err:=dbop.AddUser(user);err!=nil{
 				log.Println("Add user error:",err)
 				conn.Write([]byte(err.Error()+"\n"))
@@ -55,7 +59,7 @@ func procConn(conn net.Conn){
 				log.Println("Read login info error:",err)
 			}*/
 		case "DelUser":
-			buf,_,err:=rd.ReadLine()
+/*			buf,_,err:=rd.ReadLine()
 			if err!=nil{
 				log.Println("Read user register info error:",err)
 				return
@@ -65,6 +69,21 @@ func procConn(conn net.Conn){
 				log.Println("Resolve user info error:",err)
 				return
 			}
+*/
+			user:=new(dbop.UserInfo)
+			if buf,_,err:=rd.ReadLine();err!=nil{
+				log.Println("Read user register user error:",err)
+				return
+			}else{
+				user.Username=string(buf)
+			}
+			if buf,_,err:=rd.ReadLine();err!=nil{
+				log.Println("Read user register password error:",err)
+				return
+			}else{
+				user.Password=string(buf)
+			}
+
 
 			if online,ok:=online_user[user.Username];ok{
 				online<-1 // start offline

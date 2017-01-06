@@ -30,7 +30,7 @@ type MsgInfo struct{ // one table for each user
 }
 
 var dbdrv string="mysql"
-var dblogin string="work:abcd1234@tcp(127.0.0.1:3306)/chat"
+var dblogin string="work:Work4All;@tcp(123.206.55.31:3306)/chat"
 
 func FindUser(username string) (* UserInfo,error){
 	db,err:=sql.Open(dbdrv,dblogin)
@@ -105,7 +105,7 @@ func DelUser(name string, passwd string)error{
 		return err
 	}
 	defer db.Close()
-	query:="delete from users where username="+name
+	query:=fmt.Sprintf("delete from users where username='%s'",info.Username)
 	if _,err:=db.Exec(query);err!=nil{
 		log.Println("Delete user failed:",err)
 		return err

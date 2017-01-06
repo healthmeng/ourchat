@@ -5,13 +5,14 @@ import (
 "fmt"
 "bufio"
 "crypto/sha256"
-"encoding/json"
+//"encoding/json"
 "os/exec"
 "os"
 // "compress/gzip"
 )
 
-var svraddr string = "123.206.55.31"
+var svraddr string = "127.0.0.1"
+//var svraddr string = "123.206.55.31"
 var svrport string = ":2048"
 
 
@@ -57,13 +58,14 @@ func doRegister(){
 		return
 	}
 	defer conn.Close()
-	addtext:="AddUser\n"
-	obj,err:=json.Marshal(info);
+	addtext:="AddUser\n"+info.Username+"\n"+info.Password+"\n"
+/*	obj,err:=json.Marshal(info);
 	if err!=nil{
 		fmt.Println("json failed")
 		return
 	}
 	addtext+=string(append(obj,'\n'))
+*/
 	conn.Write([]byte(addtext))
 	brd:=bufio.NewReader(conn)
 	if buf,_,err:=brd.ReadLine();err!=nil{
@@ -75,6 +77,37 @@ func doRegister(){
 }
 
 func doDel(){
+	info:=new (UserInfo)
+	fmt.Println("username:")
+	fmt.Scanf("%s",&info.Username)
+	var orgpass string
+	exec.Command("/bin/stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
+	exec.Command("/bin/stty", "-F", "/dev/tty", "-echo").Run()
+	fmt.Println("Password:")
+	fmt.Scanf("%s",&orgpass)
+	exec.Command("/bin/stty", "-F", "/dev/tty", "echo").Run()
+	sha:=sha256.Sum256([]byte(orgpass))
+	info.Password=""
+	for i:=0;i<sha256.Size;i++{
+		info.Password+=fmt.Sprintf("%02x",sha[i])
+	}
+
+	conn,err:=net.Dial("tcp",svraddr+svrport)
+	if err!=nil{
+		fmt.Println("Connect to server failed")
+		return
+	}
+	defer conn.Close()
+	addtext:="DelUser\n"+info.Username+"\n"+info.Password+"\n"
+	conn.Write([]byte(addtext))
+	brd:=bufio.NewReader(conn)
+	if buf,_,err:=brd.ReadLine();err!=nil{
+		fmt.Println("Read result error:",err)
+		return
+	}else{
+		fmt.Println(string(buf))
+	}
+
 }
 
 func doLogin(){
@@ -82,10 +115,10 @@ func doLogin(){
 
 func main(){
 	if len(os.Args)==1{
-		fmt.Println("client register\nclient del\nclient login")
+		fmt.Println("client register(reg)\nclient del\nclient login")
 		return
 	}
-	if os.Args[1]=="register"{
+	if os.Args[1]=="reg" || os.Args[1]=="register"{
 		doRegister()
 	} else if os.Args[1]=="del" {
 		doDel()
