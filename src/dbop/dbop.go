@@ -32,6 +32,36 @@ type MsgInfo struct{ // one table for each user
 var dbdrv string="mysql"
 var dblogin string="work:Work4All;@tcp(123.206.55.31:3306)/chat"
 
+func (info* UserInfo)LoadInfo() error{
+	dbinfo,_:=FindUser(info.Username)
+	if dbinfo!=nil{
+		*info=*dbinfo
+		return nil
+	} else{
+		return errors.New("LoadInfo: user not found")
+	}
+}
+
+func (info* UserInfo)SaveInfo() error{
+	dbinfo,_:=FindUser(info.Username)
+	if dbinfo!=nil{
+	}else{
+		return errors.New("SaveInfo: user not found")
+	}
+	db,err:=sql.Open(dbdrv,dblogin)
+	if err!=nil{
+		log.Println("Open database failed")
+		return err
+	}
+	defer db.Close()
+	query:=fmt.Sprintf("update users set pwsha256='%s,descr='%s',face='%s',phone='%s' where uid=%d",info.Password,info.Descr,info.Face,info.Phone,info.UID)
+	if _,err:=db.Exec(query);err!=nil{
+		log.Println("Update db error:",err)
+		return err
+	}
+	return nil
+}
+
 func FindUser(username string) (* UserInfo,error){
 	db,err:=sql.Open(dbdrv,dblogin)
 	if err!=nil{
@@ -78,7 +108,7 @@ func AddUser(info *UserInfo) error{
 		return err
 	}else{
 		info.UID ,_= result.LastInsertId()
-		query=fmt.Sprintf("create table `msg%d` (`msgid` int(11) not null AUTO_INCREMENT, `type` smallint(3) not null, `content` varchar(1024), `touid` int(11) not null, `arrived` tinyint(1) not null, `svrstamp` datetime, PRIMARY KEY(`msgid`))",info.UID)
+		query=fmt.Sprintf("create table `msg%d` (`msgid` int(11) not null AUTO_INCREMENT, `type` smallint(3) not null, `content` varchar(1024), `fromuid` int(11) not null, `touid` int(11) not null, `arrived` tinyint(1) not null, `svrstamp` datetime, PRIMARY KEY(`msgid`))",info.UID)
 		if _,err:=db.Exec(query);err!=nil{
 			log.Println("Create msg table error:",err)
 			return err

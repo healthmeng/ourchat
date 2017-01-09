@@ -7,10 +7,31 @@ import(
 "bufio"
 "time"
 "dbop"
+"container/list"
+"sync"
 //"encoding/json"
 )
 
-var online_user map[string] chan int
+type Message struct{
+	MsgID int
+	Msgtype int
+	Msgtxt string
+	Msgfrom int64
+	Msgto	int64
+	Msgtime string
+}
+
+type OLUser struct{
+	*dbop.UserInfo
+	Ctrloff chan int
+	Ctrlmsg chan int
+	SendQ *list.List // type Message
+	Sendlock sync.Mutex
+	PostQ *list.List
+	PostLock sync.Mutex
+}
+
+var online_user map[string] *OLUser
 
 func procConn(conn net.Conn){
 	conn.SetDeadline(time.Now().Add(time.Second*30))
@@ -86,8 +107,8 @@ func procConn(conn net.Conn){
 
 
 			if online,ok:=online_user[user.Username];ok{
-				online<-1 // start offline
-				<-online // finished 
+				online.Ctrloff<-1 // start offline
+				<-online.Ctrloff // finished 
 			//	delete(online_user,user.Username) //should be done in connection routine
 			}
 			if err:=dbop.DelUser(user.Username,user.Password);err!=nil{
@@ -102,7 +123,7 @@ func procConn(conn net.Conn){
 
 func main(){
 	fmt.Println("Start")
-	online_user=make( map[string] chan int)
+	online_user=make( map[string] *OLUser)
 	lisn,err:=net.Listen("tcp",":2048")
 	if err!=nil{
 		fmt.Println("Server listen tcp error:",err)
