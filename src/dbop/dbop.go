@@ -3,11 +3,14 @@ package dbop
 import (
 "database/sql"
 "log"
+"os"
 "errors"
 "fmt"
 _"github.com/Go-SQL-Driver/MySQL"
 "time"
 )
+
+var db *sql.DB
 
 type UserInfo struct{
 	UID int64
@@ -21,16 +24,44 @@ type UserInfo struct{
 
 type MsgInfo struct{ // one table for each user
 	MsgID int64
-	Type int
+	Type int // 1 txt; 2 pic; 3 file
 	Content string
-//	FromUID int // always same
+	FromUID int // always same
 	ToUID int64
 	Arrived int
 	SvrStamp string
 }
 
-var dbdrv string="mysql"
-var dblogin string="work:Work4All;@tcp(123.206.55.31:3306)/chat"
+func init(){
+	var err error
+	db,err=sql.Open("mysql","work:Work4All;@tcp(123.206.55.31:3306)/chat")
+	if err!=nil{
+		log.Println("Open database error:",err)
+		os.Exit(1)
+	}
+}
+
+func (info* UserInfo)GetUnsentMsg()([]MsgInfo,error){
+	msgtb:=fmt.Sprintf("msg%d",info.UID)
+	query:=fmt.Sprintf("select * from %s where arrived=0",msgtb)
+	msgs:=make([]MsgInfo,0,20)
+	res,err:=db.Query(query)
+	if err!=nil{
+		log.Println("Query messages error")
+		return nil,err
+	}
+	for ;res.Next();{
+		var msg MsgInfo
+		err:=res.Scan(&msg.MsgID,&msg.Type,&msg.FromUID,&msg.ToUID,
+					&msg.Arrived,&msg.SvrStamp)
+		if err!=nil{
+			log.Println("Parse db message error:",err)
+			return nil,err
+		}
+		msgs=append(msgs,msg)
+	}
+	return msgs,nil
+}
 
 func (info* UserInfo)LoadInfo() error{
 	dbinfo,_:=FindUser(info.Username)
@@ -48,12 +79,6 @@ func (info* UserInfo)SaveInfo() error{
 	}else{
 		return errors.New("SaveInfo: user not found")
 	}
-	db,err:=sql.Open(dbdrv,dblogin)
-	if err!=nil{
-		log.Println("Open database failed")
-		return err
-	}
-	defer db.Close()
 	query:=fmt.Sprintf("update users set pwsha256='%s,descr='%s',face='%s',phone='%s' where uid=%d",info.Password,info.Descr,info.Face,info.Phone,info.UID)
 	if _,err:=db.Exec(query);err!=nil{
 		log.Println("Update db error:",err)
@@ -63,12 +88,6 @@ func (info* UserInfo)SaveInfo() error{
 }
 
 func FindUser(username string) (* UserInfo,error){
-	db,err:=sql.Open(dbdrv,dblogin)
-	if err!=nil{
-		log.Println("Open database failed")
-		return nil,err
-	}
-	defer db.Close()
 	query:=fmt.Sprintf("select * from users where username='%s'",username)
 	res,err:=db.Query(query)
 	if err!=nil{
@@ -94,12 +113,6 @@ func AddUser(info *UserInfo) error{
 	if find,_:=FindUser(info.Username);find!=nil{
 		return errors.New("User already exists")
 	}
-	db,err:=sql.Open(dbdrv,dblogin)
-	if err!=nil{
-		log.Println("Open database failed")
-		return err
-	}
-	defer db.Close()
 	tm:=time.Now().Local()
 	info.RegTime=fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d", tm.Year(), tm.Month(), tm.Day(), tm.Hour(), tm.Minute(), tm.Second())
 	query:=fmt.Sprintf("insert into users (username,pwsha256,descr,face,phone,regtime) values ('%s','%s','%s','%s','%s','%s')",info.Username,info.Password,info.Descr,info.Face,info.Phone,info.RegTime)
@@ -129,12 +142,6 @@ func DelUser(name string, passwd string)error{
 	if passwd!=info.Password{
 		return errors.New("Username/Password is incorrect")
 	}
-	db,err:=sql.Open(dbdrv,dblogin)
-	if err!=nil{
-		log.Println("Open database failed")
-		return err
-	}
-	defer db.Close()
 	query:=fmt.Sprintf("delete from users where username='%s'",info.Username)
 	if _,err:=db.Exec(query);err!=nil{
 		log.Println("Delete user failed:",err)

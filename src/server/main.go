@@ -8,31 +8,20 @@ import(
 "time"
 "dbop"
 "container/list"
-"time"
+"strings"
 "sync"
 //"encoding/json"
 )
 
-type Message struct{
-	MsgID int
-	Msgtype int
-	Msgtxt string
-	Msgfrom int64
-	Msgto	int64
-	Msgtime string
-}
-
-func (msg* Message)SendOK(){
-}
-
-
 type OLUser struct{
 	*dbop.UserInfo
-	Ctrloff chan int
-	Statmsg chan int
-	Newjob	chan string 
-	SendQ *list.List // type Message，load from db
-	Sendlock *sync.Mutex
+	CtrlIn chan int
+	CtrlOut chan int
+	RdMsg	chan int
+	Newjob	chan string
+	SendQ *list.List // type MessageID，load from db
+	MsgSet map[int64] dbop.MsgInfo
+	Sendlock *sync.RWMutex
 	NetConn net.Conn
 }
 
@@ -41,20 +30,88 @@ type OLUser struct{
 var online_user map[string] *OLUser
 var maplock sync.RWMutex
 
-func (ouser* OLUser)LoadMessageQ(){
+func (ouser* OLUser)LoadMessageQ()error{
 	// called only in writeproc
+	msgs,err:=ouser.GetUnsentMsg()
+	if err!=nil{
+		return err
+	}
+	ouser.Sendlock.Lock()
+	for _,msg:=range msgs{
+		if _,ok:=ouser.MsgSet[msg.MsgID];ok{
+			continue
+		}else{
+			ouser.MsgSet[msg.MsgID]=msg
+			ouser.SendQ.PushBack(msg.MsgID)
+		}
+	}
+	ouser.Sendlock.Unlock()
+	return nil
 }
 
 func (ouser* OLUser)ReadProc(){
+
+}
+
+func (ouser* OLUser)DoSendMsg(){
+	ouser.LoadMessageQ()
+	ouser.Sendlock.RLock()
+	for ele:=ouser.SendQ.Front();ele!=nil;ele=ele.Next(){
+		// do write to netconn
+		msgid,_:=ele.Value.(int64)
+		msg,ok:=ouser.MsgSet[msgid]
+		if !ok{
+			log.Println("Warning: message id not found in msgset")
+			continue
+		}
+		switch msg.Type{
+			case  1:
+			ouser.NetConn.Write([]byte("SendMsg\n"+msg.Content+"\n"))
+		//	case 2:
+		//	case 3:
+		}
+	}
+	ouser.Sendlock.RUnlock()
 }
 
 func (ouser* OLUser)WriteProc(){
+// todo  send online users to client
+	users:="Users\n"
+	maplock.RLock()
+	for name,_:=range online_user{
+		if name==ouser.Username{
+			continue
+		}
+		users+=name+"\n"
+	}
+	maplock.RUnlock()
+	ouser.NetConn.Write([]byte(users))
+///////////////////////////
 	for{
 		select{
-			case job:=<-ouser.Newjob:
-			case time.After(timer.Second*
+		case job:= <-ouser.Newjob:
+			com:=strings.Split(job,"\n")
+			switch com[0]{
+			case "Offline":
+				return
+			case "Send":
+				// find in db
+				ouser.DoSendMsg()
+			case "Reply":	// OK\n+WindowNum\n
+				ouser.NetConn.Write([]byte("ReplyID\n"+com[1]+"\n"))
+			}
+		case <-time.After(time.Minute):
+			ouser.DoSendMsg()
 		}
 	}
+}
+
+func (ouser* OLUser)DoOffline(){
+	maplock.Lock()
+	delete(online_user,ouser.Username) //should be done in connection routine
+	maplock.Unlock()
+	ouser.Newjob<-"Offline\n"
+	ouser.CtrlOut<-1
 }
 
 func doClose(conn net.Conn, pClose *bool){
@@ -63,37 +120,48 @@ func doClose(conn net.Conn, pClose *bool){
 	}
 }
 
+
 func DoOnline(uinfo* dbop.UserInfo, conn net.Conn){
-	oluser:= &OLUser{dbopUser,
-					make(chan, int), make (chan int), make (chan string),
-					list.New(), new (sync.Mutex),conn}
+	oluser:= &OLUser{uinfo,make(chan int,1),make(chan int,1),make(chan int,1),
+					make(chan string,10), list.New(),make(map[int64] dbop.MsgInfo),
+					new (sync.RWMutex),conn}
+	oluser.SendQ.Init()
 /*
 		1. Create ouser obj in map
 		2. Monitor ctrl chan
-		3. Try to Send messages to client and enter communication mode with client(read/write)
+		3. Send online users to client
+		4. Try to Send messages to client and enter communication mode with client(read/write)
 */
 	maplock.Lock()
-	online_user[userinfo.Username]=oluser
+	online_user[uinfo.Username]=oluser
 	maplock.Unlock()
-	go  oluser.ReadProc
-	go  oluser.WriteProc
+	go  oluser.ReadProc()
+	go  oluser.WriteProc()
 	for{
 		select{
-		case ctl:= <-oluser.Ctrloff:
+		case <-oluser.CtrlIn:
 			// do offline
-		case msg:=<-oluser.Statmsg:
+			oluser.DoOffline()
+		case msg:=<-oluser.RdMsg:
 /* 	1. get send response
 	2. get heart beat
 	3. get client's new message
 	4. get offline inform
 	*/
-			select msg{
+			switch msg{
 				case 1:
-
+					fallthrough
 				case 2: // heartbeat
+					fallthrough
+				case 3:
+					break
 				default:
+					oluser.DoOffline()
+					return
 			}
 		case <-time.After(time.Second*60):
+			oluser.DoOffline()
+			return
 			// no message in 60 seconds, timeout
 			// do offline
 		}
@@ -156,11 +224,11 @@ func procConn(conn net.Conn){
 				return
 			}
 			maplock.RLock()
-			online,ok:=online_user[user.Username]
+			online,ok:=online_user[string(usr)]
 			maplock.RUnlock()
 			if ok{
-				online.Ctrloff<-1 // start offline
-				<-online.Ctrloff // finished 
+				online.CtrlIn<-1 // start offline
+				<-online.CtrlOut // finished 
 			//	delete(online_user,user.Username) //should be done in connection routine
 			}
 
@@ -169,7 +237,7 @@ func procConn(conn net.Conn){
 				conn.Write([]byte("ERROR: No such user\n"))
 				return
 			}
-			if uinfo.Password!=psw{
+			if uinfo.Password!=string(psw){
 				conn.Write([]byte("ERROR: Bad user/passwd\n"))
 				return
 			}
@@ -209,8 +277,8 @@ func procConn(conn net.Conn){
 			online,ok:=online_user[user.Username]
 			maplock.RUnlock()
 			if ok{
-				online.Ctrloff<-1 // start offline
-				<-online.Ctrloff // finished 
+				online.CtrlIn<-1 // start offline
+				<-online.CtrlOut // finished 
 			//	delete(online_user,user.Username) //should be done in connection routine
 			}
 			if err:=dbop.DelUser(user.Username,user.Password);err!=nil{
