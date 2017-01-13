@@ -21,7 +21,7 @@ type OLUser struct {
 	RdMsg    chan int
 	Newjob   chan string
 	SendQ    *list.List // type MessageID，load from db
-	MsgSet   map[int]dbop.MsgInfo
+	MsgSet   map[int64]dbop.MsgInfo
 	Sendlock *sync.RWMutex
 	NetConn  net.Conn
 }
@@ -48,22 +48,48 @@ func (ouser *OLUser) LoadMessageQ() error {
 	return nil
 }
 
+func (ouser *OLUser) ParseMsg(buf []byte,rd *bufio.Reader)(*dbop.MsgInfo,error){
+// 	ToUID Type Length\n
+//	Content
+	head:=string(buf)
+	var filelen int
+	var msg dbop.MsgInfo
+	msg.FromUID=ouser.UID
+	msg.Arrived=0
+	tm := time.Now().Local()
+    msg.SvrStamp = fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d", tm.Year(), tm.Month(), tm.Day(), tm.Hour(), tm.Minute(), tm.Second())
+	fmt.Sscanf(head,"%d%d%d%d",&msg.ToUID,&msg.Type,&filelen)
+	switch msg.Type{
+	case 1: // txt
+		content,_,err:=rd.ReadLine()
+		if err!=nil{
+			log.Println("Get message content error")
+			return nil,err
+		}
+		if len(content)!=filelen{
+			log.Println("Warning: read bytes != msg length")
+		}
+	}
+	return &msg,nil
+}
+
 func (ouser *OLUser) ReadProc() {
 	rd := bufio.NewReader(ouser.NetConn)
 	for {
-		cmd, _, err := rd.ReadLine()
+		cmdbuf, _, err := rd.ReadLine()
 		if err != nil {
 			return
 		}
-		switch string(cmd) {
-		case "Confirm": // confirm\n ID\n
+		cmd:=string(cmdbuf)
+		switch cmd {
+			case "Confirm": // confirm\n ID\n
 			msgbuf, _, err := rd.ReadLine()
 			if err != nil {
 				log.Println("Get confirm id error:", err)
 				return
 			}
 
-			msgid, err := strconv.Atoi(string(msgbuf))
+			msgid, err := strconv.ParseInt(string(msgbuf),10,64)
 			if err != nil {
 				log.Println("Incorrect confirm msgid")
 				continue
@@ -73,7 +99,7 @@ func (ouser *OLUser) ReadProc() {
 				ouser.Sendlock.Lock()
 				delete(ouser.MsgSet, msgid)
 				for it := ouser.SendQ.Front(); it != nil; it = it.Next() {
-					id, _ := it.Value.(int)
+					id, _ := it.Value.(int64)
 					if id == msgid {
 						ouser.SendQ.Remove(it)
 						break
@@ -81,49 +107,42 @@ func (ouser *OLUser) ReadProc() {
 				}
 				ouser.Sendlock.Unlock()
 			}
+			ouser.RdMsg<-1
+		case "Heartbeat":
+			ouser.RdMsg<-2
 		case "SendMsg":
 			buf,_,err:=rd.ReadLine()
 			if err!=nil{
 				log.Println("Get client msgid error:",err)
 				return
 			}
-			msginfo,err:=ParseMsg(buf) // *MsgInfo
+			msginfo,err:=ouser.ParseMsg(buf,rd) // *MsgInfo
+
 			if err!=nil{
 				log.Println("Error client message format")
 				rd.Reset(ouser.NetConn)
+				break
+			}
+			usr,err:=dbop.LookforUID(msginfo.ToUID)
+			if err!=nil{
+				log.Println("Lookfor uid error")
+				rd.Reset(ouser.NetConn)
+				break
 			}
 			if err:=ouser.RegisterMsg(msginfo);err!=nil{
 				// todo:
 				// get touid, if online, post to its write queue
-			}
-/*
-			idbuf,_,err:=rd.ReadLine()
-			if err!=nil{
-				log.Println("Get client msgid error:",err)
-				return
-			}
-			msgid,err:=strconv.Atoi(string(idbuf))
-			if err!=nil{
-				log.Println("Get msg error: not valid msgid")
-				rd.Reset(ouser.NetConn)
-			}
-			typebuf,_,err:=rd.ReadLine()
-			if err!=nil{
-				log.Println("Get client typeid error:",err)
-				return
-			}
-			typeid,err:=strconv.Atoi(string(typebuf))
-			switch typeid{
-			case 1:
-				content,_,err:=rd.ReadLine()
-				if err!=nil{
-					log.Println("Get client message content error:",err)
-					return
+				maplock.RLock()
+				toclient,ok:=online_user[usr.Username]
+				maplock.RUnlock()
+				ouser.RdMsg<-3
+				if ok{
+					toclient.Newjob<-"Send"
 				}
+			}
 			default:
-				log.Println("Unknown message type:",typeid)
+				log.Println("Unknown message type:",cmd)
 				rd.Reset(ouser.NetConn)
-			}*/
 		}
 	}
 }
@@ -133,7 +152,7 @@ func (ouser *OLUser) DoSendMsg() {
 	ouser.Sendlock.RLock()
 	for ele := ouser.SendQ.Front(); ele != nil; ele = ele.Next() {
 		// do write to netconn
-		msgid, _ := ele.Value.(int)
+		msgid, _ := ele.Value.(int64)
 		msg, ok := ouser.MsgSet[msgid]
 		if !ok {
 			log.Println("Warning: message id not found in msgset")
@@ -141,7 +160,8 @@ func (ouser *OLUser) DoSendMsg() {
 		}
 		switch msg.Type {
 		case 1: // SendMsg\n MsgID(WindowID)\n MsgType\n Content\0"
-			ouser.NetConn.Write(append([]byte("SendMsg\n"+fmt.Sprintf("%ld\n", msg.MsgID)+msg.Content), 0))
+			ouser.NetConn.Write([]byte("SendMsg\n"+fmt.Sprintf("%d %d %s\n", msg.MsgID,len(msg.Content)+1,msg.SvrStamp)+msg.Content+"\n"))
+			//ouser.NetConn.Write(append([]byte("SendMsg\n"+fmt.Sprintf("%d\n", msg.MsgID)+msg.Content), 0))
 			//	case 2:
 			//	case 3:
 		}
@@ -149,8 +169,7 @@ func (ouser *OLUser) DoSendMsg() {
 	ouser.Sendlock.RUnlock()
 }
 
-func (ouser *OLUser) WriteProc() {
-	// todo  send online users to client
+func (ouser *OLUser)UpdateUser(){
 	users := "Users\n"
 	maplock.RLock()
 	for name, _ := range online_user {
@@ -161,7 +180,10 @@ func (ouser *OLUser) WriteProc() {
 	}
 	maplock.RUnlock()
 	ouser.NetConn.Write([]byte(users))
-	///////////////////////////
+}
+
+func (ouser *OLUser) WriteProc() {
+	ouser.UpdateUser()
 	for {
 		select {
 		case job := <-ouser.Newjob:
@@ -172,8 +194,11 @@ func (ouser *OLUser) WriteProc() {
 			case "Send":
 				// find in db
 				ouser.DoSendMsg()
-			case "Reply": // OK\n+WindowNum\n
-				ouser.NetConn.Write([]byte("ReplyID\n" + com[1] + "\n"))
+//			case "Reply": // OK\n+WindowNum\n
+//				ouser.NetConn.Write([]byte("ReplyID\n" + com[1] + "\n"))
+			case "Refresh":
+				//////////
+				ouser.UpdateUser()
 			}
 		case <-time.After(time.Minute):
 			ouser.DoSendMsg()
@@ -186,6 +211,13 @@ func (ouser *OLUser) DoOffline() {
 	delete(online_user, ouser.Username) //should be done in connection routine
 	maplock.Unlock()
 	ouser.Newjob <- "Offline\n"
+///////////////
+
+	maplock.RLock()
+	for _,usr:=range online_user{
+		usr.Newjob<-"Refresh"
+	}
+	maplock.RUnlock()
 	ouser.CtrlOut <- 1
 }
 
@@ -196,8 +228,9 @@ func doClose(conn net.Conn, pClose *bool) {
 }
 
 func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
-	oluser := &OLUser{uinfo, make(chan int, 1), make(chan int, 1), make(chan int, 1),
-		make(chan string, 10), list.New(), make(map[int]dbop.MsgInfo),
+	oluser := &OLUser{uinfo, make(chan int, 1), make(chan int, 1),
+	make(chan int, 10),make(chan string, 10),
+	list.New(), make(map[int64] dbop.MsgInfo),
 		new(sync.RWMutex), conn}
 	oluser.SendQ.Init()
 	/*
@@ -211,6 +244,9 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 	maplock.Unlock()
 	go oluser.ReadProc()
 	go oluser.WriteProc()
+////////////////
+	// todo: inform all other online users to send new user online msg
+
 	for {
 		select {
 		case <-oluser.CtrlIn:
@@ -229,7 +265,7 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 				fallthrough
 			case 3:
 				break
-			default:
+			case 4:
 				oluser.DoOffline()
 				return
 			}
@@ -243,11 +279,11 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 }
 
 func procConn(conn net.Conn) {
-	conn.SetDeadline(time.Now().Add(time.Second * 30))
+//	conn.SetDeadline(time.Now().Add(time.Second * 30))
 	//	pClose:=new(bool)
 	//	*pClose=true
 	//	defer doClose(conn,pClose)
-	conn.Close()
+	defer conn.Close()
 	rd := bufio.NewReader(conn)
 	command, _, err := rd.ReadLine()
 	if err != nil {
@@ -288,17 +324,20 @@ func procConn(conn net.Conn) {
 				go routine (read,write,chan)
 		*/
 		usr, _, err := rd.ReadLine()
+		user:=string(usr)
 		if err != nil {
 			log.Println("Login read username error:", err)
 			return
 		}
-		psw, _, err := rd.ReadLine()
+
+		psw, _, err:= rd.ReadLine()
 		if err != nil {
 			log.Println("Login read password error:", err)
 			return
 		}
+
 		maplock.RLock()
-		online, ok := online_user[string(usr)]
+		online, ok := online_user[user]
 		maplock.RUnlock()
 		if ok {
 			online.CtrlIn <- 1 // start offline
@@ -306,7 +345,7 @@ func procConn(conn net.Conn) {
 			//	delete(online_user,user.Username) //should be done in connection routine
 		}
 
-		uinfo, _ := dbop.FindUser(string(usr))
+		uinfo, _ := dbop.FindUser(user)
 		if uinfo == nil {
 			conn.Write([]byte("ERROR: No such user\n"))
 			return
@@ -320,7 +359,7 @@ func procConn(conn net.Conn) {
 		DoOnline(uinfo, conn)
 
 	case "DelUser":
-		/*			buf,_,err:=rd.ReadLine()
+		/*		buf,_,err:=rd.ReadLine()
 					if err!=nil{
 						log.Println("Read user register info error:",err)
 						return

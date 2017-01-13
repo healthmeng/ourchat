@@ -23,11 +23,11 @@ type UserInfo struct{
 }
 
 type MsgInfo struct{ // one table for each user
-	MsgID int
+	MsgID int64
 	Type int // 1 txt; 2 pic; 3 file
 	Content string
-	FromUID int // always same
-	ToUID int64
+	FromUID int64
+	ToUID int64 // always same
 	Arrived int
 	SvrStamp string
 }
@@ -41,8 +41,8 @@ func init(){
 	}
 }
 
-func (info* UserInfo)ConfirmMsg(msgid int)error{
-	query:=fmt.Sprintf("update msg%ld set arrived=1 where msgid=%ld",info.UID,msgid)
+func (info* UserInfo)ConfirmMsg(msgid int64)error{
+	query:=fmt.Sprintf("update msg%d set arrived=1 where msgid=%d",info.UID,msgid)
 	_,err:=db.Exec(query)
 	if err!=nil{
 		log.Println("update msgdb error:",err)
@@ -51,11 +51,19 @@ func (info* UserInfo)ConfirmMsg(msgid int)error{
 }
 
 func (info* UserInfo)RegisterMsg(msginfo *MsgInfo) error{
-	return nil
+	msgtb:=fmt.Sprintf("msg%d",msginfo.ToUID)
+	query:=fmt.Sprintf("insert into %s ('type','content','fromuid','arrived','svrstamp') values ('%d','%s','%d','%d','%s')",msgtb,msginfo.Type,msginfo.Content,msginfo.FromUID,0,msginfo.SvrStamp)
+	if result,err:=db.Exec(query);err!=nil{
+		log.Println("Register message error:",err)
+		return err
+	}else{
+		msginfo.MsgID,_=result.LastInsertId()
+		return nil
+	}
 }
 
 func (info* UserInfo)GetUnsentMsg()([]MsgInfo,error){
-	msgtb:=fmt.Sprintf("msg%ld",info.UID)
+	msgtb:=fmt.Sprintf("msg%d",info.UID)
 	query:=fmt.Sprintf("select * from %s where arrived=0",msgtb)
 	msgs:=make([]MsgInfo,0,20)
 	res,err:=db.Query(query)
@@ -65,12 +73,13 @@ func (info* UserInfo)GetUnsentMsg()([]MsgInfo,error){
 	}
 	for ;res.Next();{
 		var msg MsgInfo
-		err:=res.Scan(&msg.MsgID,&msg.Type,&msg.FromUID,&msg.ToUID,
+		err:=res.Scan(&msg.MsgID,&msg.Type,&msg.FromUID,
 					&msg.Arrived,&msg.SvrStamp)
 		if err!=nil{
 			log.Println("Parse db message error:",err)
 			return nil,err
 		}
+		msg.ToUID=info.UID
 		msgs=append(msgs,msg)
 	}
 	return msgs,nil
@@ -92,7 +101,7 @@ func (info* UserInfo)SaveInfo() error{
 	}else{
 		return errors.New("SaveInfo: user not found")
 	}
-	query:=fmt.Sprintf("update users set pwsha256='%s,descr='%s',face='%s',phone='%s' where uid=%ld",info.Password,info.Descr,info.Face,info.Phone,info.UID)
+	query:=fmt.Sprintf("update users set pwsha256='%s,descr='%s',face='%s',phone='%s' where uid=%d",info.Password,info.Descr,info.Face,info.Phone,info.UID)
 	if _,err:=db.Exec(query);err!=nil{
 		log.Println("Update db error:",err)
 		return err
@@ -102,6 +111,26 @@ func (info* UserInfo)SaveInfo() error{
 
 func FindUser(username string) (* UserInfo,error){
 	query:=fmt.Sprintf("select * from users where username='%s'",username)
+	res,err:=db.Query(query)
+	if err!=nil{
+		fmt.Println("find user query error:",err)
+		return nil,err
+	}
+	if res.Next(){
+		info:=new(UserInfo)
+		if err:=res.Scan(&info.UID,	&info.Username,
+				&info.Password,&info.Descr,&info.Face,
+				&info.Phone,&info.RegTime);err!=nil{
+			log.Println("Query error:",err)
+			return nil,err
+		}
+		return info,nil
+	}
+	return nil,nil
+}
+
+func LookforUID(uid int64) (* UserInfo,error){
+	query:=fmt.Sprintf("select * from users where uid='%d'",uid)
 	res,err:=db.Query(query)
 	if err!=nil{
 		fmt.Println("find user query error:",err)
@@ -134,7 +163,7 @@ func AddUser(info *UserInfo) error{
 		return err
 	}else{
 		info.UID ,_= result.LastInsertId()
-		query=fmt.Sprintf("create table `msg%ld` (`msgid` int(11) not null AUTO_INCREMENT, `type` smallint(3) not null, `content` varchar(1024), `fromuid` int(11) not null, `touid` int(11) not null, `arrived` tinyint(1) not null, `svrstamp` datetime, PRIMARY KEY(`msgid`))",info.UID)
+		query=fmt.Sprintf("create table `msg%d` (`msgid` int(11) not null AUTO_INCREMENT, `type` smallint(3) not null, `content` varchar(1024), `fromuid` int(11) not null, `arrived` tinyint(1) not null, `svrstamp` datetime, PRIMARY KEY(`msgid`))",info.UID)
 		if _,err:=db.Exec(query);err!=nil{
 			log.Println("Create msg table error:",err)
 			return err
@@ -160,7 +189,7 @@ func DelUser(name string, passwd string)error{
 		log.Println("Delete user failed:",err)
 		return err
 	}
-	query=fmt.Sprintf("drop table if exists msg%ld",info.UID)
+	query=fmt.Sprintf("drop table if exists msg%d",info.UID)
 	db.Exec(query)
 	return nil
 }
