@@ -111,6 +111,37 @@ func doDel(){
 }
 
 func doLogin(){
+	info:=new (UserInfo)
+	fmt.Println("username:")
+	fmt.Scanf("%s",&info.Username)
+	var orgpass string
+	exec.Command("/bin/stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
+	exec.Command("/bin/stty", "-F", "/dev/tty", "-echo").Run()
+	fmt.Println("Password:")
+	fmt.Scanf("%s",&orgpass)
+	exec.Command("/bin/stty", "-F", "/dev/tty", "echo").Run()
+	sha:=sha256.Sum256([]byte(orgpass))
+	info.Password=""
+	for i:=0;i<sha256.Size;i++{
+		info.Password+=fmt.Sprintf("%02x",sha[i])
+	}
+
+	conn,err:=net.Dial("tcp",connstr)
+	if err!=nil{
+		fmt.Println("Connect to server failed")
+		return
+	}
+	defer conn.Close()
+	addtext:="Login\n"+info.Username+"\n"+info.Password+"\n"
+	conn.Write([]byte(addtext))
+	brd:=bufio.NewReader(conn)
+	for{
+		if buf,_,err:=brd.ReadLine();err==nil{
+			fmt.Println(string(buf))
+		}else{
+			break
+		}
+	}
 }
 
 func initsvr(){
