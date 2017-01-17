@@ -135,9 +135,34 @@ func doLogin(){
 	addtext:="Login\n"+info.Username+"\n"+info.Password+"\n"
 	conn.Write([]byte(addtext))
 	brd:=bufio.NewReader(conn)
+	ret,_,err:=brd.ReadLine()
+	if err!=nil{
+		fmt.Println("Get login result error:",err)
+		return
+	}
+	sret:=string(ret)
+	if sret!="OK"{
+		fmt.Println("Login failed:"+sret)
+		return
+	}
+	chw:=make(chan string,10)
+	go OnlineRead(brd,chw)
+	go OnlineWrite(conn,chw)
+	for{
+	}
+}
+
+func OnlineRead(brd *bufio.Reader, chw chan string){
 	for{
 		if buf,_,err:=brd.ReadLine();err==nil{
-			fmt.Println(string(buf))
+			switch string(buf){
+			case "SendMsg":
+				info,_,err:=brd.ReadLine()
+				var mid,mtype,mlen int
+				var tm msg string;
+				fmt.Sscanf(string(info),"%d%d%d%s",&mid,&mtype,mlen)
+			
+			}
 		}else{
 			break
 		}

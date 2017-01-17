@@ -140,6 +140,9 @@ func (ouser *OLUser) ReadProc() {
 					toclient.Newjob<-"Send"
 				}
 			}
+		case "Offline":
+			// imform all online users reload user info
+				ouser.DoOffline()
 			default:
 				log.Println("Unknown message type:",cmd)
 				rd.Reset(ouser.NetConn)
@@ -159,8 +162,8 @@ func (ouser *OLUser) DoSendMsg() {
 			continue
 		}
 		switch msg.Type {
-		case 1: // SendMsg\n MsgID(WindowID)\n MsgType\n Content\0"
-			ouser.NetConn.Write([]byte("SendMsg\n"+fmt.Sprintf("%d %d %s\n", msg.MsgID,len(msg.Content)+1,msg.SvrStamp)+msg.Content+"\n"))
+		case 1: // SendMsg\n MsgID(WindowID) MsgType MsgLen time\n Content\0"
+			ouser.NetConn.Write([]byte("SendMsg\n"+fmt.Sprintf("%d %d %d %s\n", msg.MsgID,msg.Type,len(msg.Content)+1,msg.SvrStamp)+msg.Content+"\n"))
 			//ouser.NetConn.Write(append([]byte("SendMsg\n"+fmt.Sprintf("%d\n", msg.MsgID)+msg.Content), 0))
 			//	case 2:
 			//	case 3:
@@ -183,7 +186,8 @@ func (ouser *OLUser)UpdateUser(){
 }
 
 func (ouser *OLUser) WriteProc() {
-	ouser.UpdateUser()
+	ouser.UpdateUser()	// send all users info to client
+	ouser.DoSendMsg()	// try to send offline messages to client
 	for {
 		select {
 		case job := <-ouser.Newjob:
