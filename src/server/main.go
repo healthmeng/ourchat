@@ -48,29 +48,29 @@ func (ouser *OLUser) LoadMessageQ() error {
 	return nil
 }
 
-func (ouser *OLUser) ParseMsg(buf []byte,rd *bufio.Reader)(*dbop.MsgInfo,error){
-// 	ToUID Type Length\n
-//	Content
-	head:=string(buf)
+func (ouser *OLUser) ParseMsg(buf []byte, rd *bufio.Reader) (*dbop.MsgInfo, error) {
+	// 	ToUID Type Length\n
+	//	Content
+	head := string(buf)
 	var filelen int
 	var msg dbop.MsgInfo
-	msg.FromUID=ouser.UID
-	msg.Arrived=0
+	msg.FromUID = ouser.UID
+	msg.Arrived = 0
 	tm := time.Now().Local()
-    msg.SvrStamp = fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d", tm.Year(), tm.Month(), tm.Day(), tm.Hour(), tm.Minute(), tm.Second())
-	fmt.Sscanf(head,"%d%d%d%d",&msg.ToUID,&msg.Type,&filelen)
-	switch msg.Type{
+	msg.SvrStamp = fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d", tm.Year(), tm.Month(), tm.Day(), tm.Hour(), tm.Minute(), tm.Second())
+	fmt.Sscanf(head, "%d%d%d", &msg.ToUID, &msg.Type, &filelen)
+	switch msg.Type {
 	case 1: // txt
-		content,_,err:=rd.ReadLine()
-		if err!=nil{
+		content, _, err := rd.ReadLine()
+		if err != nil {
 			log.Println("Get message content error")
-			return nil,err
+			return nil, err
 		}
-		if len(content)!=filelen{
+		if len(content) != filelen {
 			log.Println("Warning: read bytes != msg length")
 		}
 	}
-	return &msg,nil
+	return &msg, nil
 }
 
 func (ouser *OLUser) ReadProc() {
@@ -80,16 +80,16 @@ func (ouser *OLUser) ReadProc() {
 		if err != nil {
 			return
 		}
-		cmd:=string(cmdbuf)
+		cmd := string(cmdbuf)
 		switch cmd {
-			case "Confirm": // confirm\n ID\n
+		case "Confirm": // confirm\n ID\n
 			msgbuf, _, err := rd.ReadLine()
 			if err != nil {
 				log.Println("Get confirm id error:", err)
 				return
 			}
 
-			msgid, err := strconv.ParseInt(string(msgbuf),10,64)
+			msgid, err := strconv.ParseInt(string(msgbuf), 10, 64)
 			if err != nil {
 				log.Println("Incorrect confirm msgid")
 				continue
@@ -107,45 +107,45 @@ func (ouser *OLUser) ReadProc() {
 				}
 				ouser.Sendlock.Unlock()
 			}
-			ouser.RdMsg<-1
+			ouser.RdMsg <- 1
 		case "Heartbeat":
-			ouser.RdMsg<-2
+			ouser.RdMsg <- 2
 		case "SendMsg":
-			buf,_,err:=rd.ReadLine()
-			if err!=nil{
-				log.Println("Get client msgid error:",err)
+			buf, _, err := rd.ReadLine()
+			if err != nil {
+				log.Println("Get client msgid error:", err)
 				return
 			}
-			msginfo,err:=ouser.ParseMsg(buf,rd) // *MsgInfo
+			msginfo, err := ouser.ParseMsg(buf, rd) // *MsgInfo
 
-			if err!=nil{
+			if err != nil {
 				log.Println("Error client message format")
-				rd.Reset(ouser.NetConn)
+				//		rd.Reset(ouser.NetConn) can't reset, or may lose heatbeat
 				break
 			}
-			usr,err:=dbop.LookforUID(msginfo.ToUID)
-			if err!=nil{
+			usr, err := dbop.LookforUID(msginfo.ToUID)
+			if err != nil {
 				log.Println("Lookfor uid error")
-				rd.Reset(ouser.NetConn)
+				//		rd.Reset(ouser.NetConn)
 				break
 			}
-			if err:=ouser.RegisterMsg(msginfo);err!=nil{
+			if err := ouser.RegisterMsg(msginfo); err != nil {
 				// todo:
 				// get touid, if online, post to its write queue
 				maplock.RLock()
-				toclient,ok:=online_user[usr.Username]
+				toclient, ok := online_user[usr.Username]
 				maplock.RUnlock()
-				ouser.RdMsg<-3
-				if ok{
-					toclient.Newjob<-"Send"
+				ouser.RdMsg <- 3
+				if ok {
+					toclient.Newjob <- "Send"
 				}
 			}
 		case "Offline":
 			// imform all online users reload user info
-				ouser.DoOffline()
-			default:
-				log.Println("Unknown message type:",cmd)
-				rd.Reset(ouser.NetConn)
+			ouser.DoOffline()
+		default:
+			log.Println("Unknown message type:", cmd)
+			//	rd.Reset(ouser.NetConn)
 		}
 	}
 }
@@ -163,7 +163,7 @@ func (ouser *OLUser) DoSendMsg() {
 		}
 		switch msg.Type {
 		case 1: // SendMsg\n MsgID(WindowID) MsgType MsgLen time\n Content\0"
-			ouser.NetConn.Write([]byte("SendMsg\n"+fmt.Sprintf("%d %d %d %s\n", msg.MsgID,msg.Type,len(msg.Content)+1,msg.SvrStamp)+msg.Content+"\n"))
+			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %s[%s]\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID,msg.SvrStamp) + msg.Content + "\n"))
 			//ouser.NetConn.Write(append([]byte("SendMsg\n"+fmt.Sprintf("%d\n", msg.MsgID)+msg.Content), 0))
 			//	case 2:
 			//	case 3:
@@ -172,22 +172,22 @@ func (ouser *OLUser) DoSendMsg() {
 	ouser.Sendlock.RUnlock()
 }
 
-func (ouser *OLUser)UpdateUser(){
+func (ouser *OLUser) UpdateUser() {
 	users := "Users\n"
 	maplock.RLock()
 	for name, _ := range online_user {
 		if name == ouser.Username {
 			continue
 		}
-		users += name + "\n"
+		users += fmt.Sprintf("%d:%s|",ouser.UID,name)
 	}
 	maplock.RUnlock()
-	ouser.NetConn.Write([]byte(users))
+	ouser.NetConn.Write([]byte(users+"\n"))
 }
 
 func (ouser *OLUser) WriteProc() {
-	ouser.UpdateUser()	// send all users info to client
-	ouser.DoSendMsg()	// try to send offline messages to client
+	ouser.UpdateUser() // send all users info to client
+	ouser.DoSendMsg()  // try to send offline messages to client
 	for {
 		select {
 		case job := <-ouser.Newjob:
@@ -195,11 +195,13 @@ func (ouser *OLUser) WriteProc() {
 			switch com[0] {
 			case "Offline":
 				return
+			case "Heartbeat":
+				ouser.NetConn.Write([]byte("Heartbeat\n"))
 			case "Send":
 				// find in db
 				ouser.DoSendMsg()
-//			case "Reply": // OK\n+WindowNum\n
-//				ouser.NetConn.Write([]byte("ReplyID\n" + com[1] + "\n"))
+				//			case "Reply": // OK\n+WindowNum\n
+				//				ouser.NetConn.Write([]byte("ReplyID\n" + com[1] + "\n"))
 			case "Refresh":
 				//////////
 				ouser.UpdateUser()
@@ -215,11 +217,11 @@ func (ouser *OLUser) DoOffline() {
 	delete(online_user, ouser.Username) //should be done in connection routine
 	maplock.Unlock()
 	ouser.Newjob <- "Offline\n"
-///////////////
+	///////////////
 
 	maplock.RLock()
-	for _,usr:=range online_user{
-		usr.Newjob<-"Refresh"
+	for _, usr := range online_user {
+		usr.Newjob <- "Refresh"
 	}
 	maplock.RUnlock()
 	ouser.CtrlOut <- 1
@@ -233,8 +235,8 @@ func doClose(conn net.Conn, pClose *bool) {
 
 func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 	oluser := &OLUser{uinfo, make(chan int, 1), make(chan int, 1),
-	make(chan int, 10),make(chan string, 10),
-	list.New(), make(map[int64] dbop.MsgInfo),
+		make(chan int, 10), make(chan string, 10),
+		list.New(), make(map[int64]dbop.MsgInfo),
 		new(sync.RWMutex), conn}
 	oluser.SendQ.Init()
 	/*
@@ -248,7 +250,7 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 	maplock.Unlock()
 	go oluser.ReadProc()
 	go oluser.WriteProc()
-////////////////
+	////////////////
 	// todo: inform all other online users to send new user online msg
 
 	for {
@@ -263,12 +265,11 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 			   	4. get offline inform
 			*/
 			switch msg {
-			case 1:
-				fallthrough
+			case 1: // confirm ok
 			case 2: // heartbeat
-				fallthrough
+				oluser.Newjob <- "Heartbeat"
 			case 3:
-				break
+			//	break
 			case 4:
 				oluser.DoOffline()
 				return
@@ -283,7 +284,7 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 }
 
 func procConn(conn net.Conn) {
-//	conn.SetDeadline(time.Now().Add(time.Second * 30))
+	//	conn.SetDeadline(time.Now().Add(time.Second * 30))
 	//	pClose:=new(bool)
 	//	*pClose=true
 	//	defer doClose(conn,pClose)
@@ -319,22 +320,22 @@ func procConn(conn net.Conn) {
 
 	case "Login": // keep heartbeat, if read or write failed or timeout, treat as logout; pic and wav，use tcp(COPYN)
 		/*
-		<---
-				login\n
-				username\n
-				passwdsha256\n
-		--->
-				OK\n | ERROR:err\n(close)
-				go routine (read,write,chan)
+			<---
+					login\n
+					username\n
+					passwdsha256\n
+			--->
+					OK\n | ERROR:err\n(close)
+					go routine (read,write,chan)
 		*/
 		usr, _, err := rd.ReadLine()
-		user:=string(usr)
+		user := string(usr)
 		if err != nil {
 			log.Println("Login read username error:", err)
 			return
 		}
 
-		psw, _, err:= rd.ReadLine()
+		psw, _, err := rd.ReadLine()
 		if err != nil {
 			log.Println("Login read password error:", err)
 			return
@@ -364,15 +365,15 @@ func procConn(conn net.Conn) {
 
 	case "DelUser":
 		/*		buf,_,err:=rd.ReadLine()
-					if err!=nil{
-						log.Println("Read user register info error:",err)
-						return
-					}
-					user:=new(dbop.UserInfo)
-					if err:=json.Unmarshal(buf,user);err!=nil{
-						log.Println("Resolve user info error:",err)
-						return
-					}
+				if err!=nil{
+					log.Println("Read user register info error:",err)
+					return
+				}
+				user:=new(dbop.UserInfo)
+				if err:=json.Unmarshal(buf,user);err!=nil{
+					log.Println("Resolve user info error:",err)
+					return
+				}
 		*/
 		user := new(dbop.UserInfo)
 		if buf, _, err := rd.ReadLine(); err != nil {

@@ -4,6 +4,7 @@ import (
 "net"
 "fmt"
 "bufio"
+"time"
 "crypto/sha256"
 //"encoding/json"
 "os/exec"
@@ -146,22 +147,77 @@ func doLogin(){
 		return
 	}
 	chw:=make(chan string,10)
-	go OnlineRead(brd,chw)
+	chmsg:=make(chan string,10)
+	go OnlineRead(brd,chw,chmsg)
 	go OnlineWrite(conn,chw)
+	go ProcInput(chw)
 	for{
+		select{
+			case <-time.After(time.Minute*2):
+				fmt.Println("Can't connect to server,try to logon again")
+				return
+			case retmsg:=<-chmsg:
+				if retmsg!="Heartbeat"{
+					fmt.Println(retmsg)
+				}
+		}
 	}
 }
 
-func OnlineRead(brd *bufio.Reader, chw chan string){
+func ProcInput(chw chan string){
+	var  uid int
+	var msg string
+	for{
+		fmt.Println("Send to(UID):")
+		fmt.Scanf("%d",&uid)
+		fmt.Println("Message:")
+		fmt.Scanf("%s",&msg)
+		output:=fmt.Sprintf("%d %d %d\n%s\n",uid,1,len(msg),msg)
+		chw<-output
+	}
+}
+
+func OnlineWrite(conn net.Conn, chw chan string){
+	tm:=time.NewTimer(time.Minute)
+	for{
+		select{
+		case wr:=<-chw:
+			if _,err:=conn.Write([]byte(wr));err!=nil{
+				return
+			}
+		case <-tm.C:
+			if _,err:=conn.Write([]byte("Heartbeat"));err!=nil{
+				return
+			}
+			tm.Reset(time.Minute)
+		}
+	}
+
+}
+
+func OnlineRead(brd *bufio.Reader, chw, chmsg chan string){
 	for{
 		if buf,_,err:=brd.ReadLine();err==nil{
 			switch string(buf){
 			case "SendMsg":
 				info,_,err:=brd.ReadLine()
+				if err!=nil{
+					return
+				}
 				var mid,mtype,mlen int
-				var tm msg string;
-				fmt.Sscanf(string(info),"%d%d%d%s",&mid,&mtype,mlen)
-			
+				var from  string;
+				fmt.Sscanf(string(info),"%d%d%d%s",&mid,&mtype,&mlen,&from)
+				/////
+				detail,_,err:=brd.ReadLine()
+				chmsg<-from+":"+string(detail)
+			case "Heatbeat":
+				chmsg<-"Heartbeat"
+			case "Users":
+				users,_,err:=brd.ReadLine()
+				if err!=nil{
+					return
+				}
+				chmsg<-"Users\n"+string(users)
 			}
 		}else{
 			break
