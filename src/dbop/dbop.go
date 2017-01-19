@@ -65,7 +65,6 @@ func (info* UserInfo)RegisterMsg(msginfo *MsgInfo) error{
 func (info* UserInfo)GetUnsentMsg()([]MsgInfo,error){
 	msgtb:=fmt.Sprintf("msg%d",info.UID)
 	query:=fmt.Sprintf("select * from %s where arrived=0",msgtb)
-log.Println("send query:",query)
 	msgs:=make([]MsgInfo,0,20)
 	res,err:=db.Query(query)
 	if err!=nil{
@@ -164,7 +163,7 @@ func AddUser(info *UserInfo) error{
 		return err
 	}else{
 		info.UID ,_= result.LastInsertId()
-		query=fmt.Sprintf("create table `msg%d` (`msgid` int(11) not null AUTO_INCREMENT, `type` smallint(3) not null, `content` varchar(1024), `fromuid` int(11) not null, `arrived` tinyint(1) not null, `svrstamp` datetime, PRIMARY KEY(`msgid`))",info.UID)
+		query=fmt.Sprintf("create table `msg%d` (`msgid` int(11) not null AUTO_INCREMENT, `type` smallint(3) not null, `content` varchar(1024), `fromuid` int(11) not null, `arrived` tinyint(1) not null, `svrstamp` datetime, PRIMARY KEY(`msgid`)) default character set=utf8",info.UID)
 		if _,err:=db.Exec(query);err!=nil{
 			log.Println("Create msg table error:",err)
 			return err

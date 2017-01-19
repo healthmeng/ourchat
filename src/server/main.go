@@ -123,6 +123,8 @@ func (ouser *OLUser) ReadProc() {
 				log.Println("Error client message format")
 				//		rd.Reset(ouser.NetConn) can't reset, or may lose heatbeat
 				break
+			}else{
+				log.Println("msg:",msginfo.Content)
 			}
 			usr, err := dbop.LookforUID(msginfo.ToUID)
 			if err != nil {
@@ -130,7 +132,7 @@ func (ouser *OLUser) ReadProc() {
 				//		rd.Reset(ouser.NetConn)
 				break
 			}
-			if err := ouser.RegisterMsg(msginfo); err != nil {
+			if err := ouser.RegisterMsg(msginfo); err == nil {
 				// todo:
 				// get touid, if online, post to its write queue
 				maplock.RLock()
@@ -138,7 +140,7 @@ func (ouser *OLUser) ReadProc() {
 				maplock.RUnlock()
 				ouser.RdMsg <- 3
 				if ok {
-					toclient.Newjob <- "Send"
+					toclient.Newjob <- "SendMsg"
 				}
 			}
 		case "Offline":
@@ -253,6 +255,13 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 	go oluser.WriteProc()
 	////////////////
 	// todo: inform all other online users to send new user online msg
+	for name, cuser:= range online_user {
+		if name == oluser.Username {
+			continue
+		}
+		cuser.Newjob<-"Refresh"
+	}
+
 
 	for {
 		select {
@@ -275,7 +284,7 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 				oluser.DoOffline()
 				return
 			}
-		case <-time.After(time.Second * 60):
+		case <-time.After(time.Second * 120):
 			oluser.DoOffline()
 			return
 			// no message in 60 seconds, timeout

@@ -55,7 +55,7 @@ func doRegister(){
 
 	conn,err:=net.Dial("tcp",connstr)
 	if err!=nil{
-		fmt.Println("Connect to server failed")
+		fmt.Println("Connect to server failed:",err)
 		return
 	}
 	defer conn.Close()
@@ -95,7 +95,7 @@ func doDel(){
 
 	conn,err:=net.Dial("tcp",connstr)
 	if err!=nil{
-		fmt.Println("Connect to server failed")
+		fmt.Println("Connect to server failed:",err)
 		return
 	}
 	defer conn.Close()
@@ -129,7 +129,7 @@ func doLogin(){
 
 	conn,err:=net.Dial("tcp",connstr)
 	if err!=nil{
-		fmt.Println("Connect to server failed")
+		fmt.Println("Connect to server failed",err)
 		return
 	}
 	defer conn.Close()
@@ -190,7 +190,7 @@ func OnlineWrite(conn net.Conn, chw chan string){
 				return
 			}
 		case <-tm.C:
-			if _,err:=conn.Write([]byte("Heartbeat"));err!=nil{
+			if _,err:=conn.Write([]byte("Heartbeat\n"));err!=nil{
 				return
 			}
 			tm.Reset(time.Minute)
@@ -214,7 +214,8 @@ func OnlineRead(brd *bufio.Reader, chw, chmsg chan string){
 				/////
 				detail,_,err:=brd.ReadLine()
 				chmsg<-from+":"+string(detail)
-			case "Heatbeat":
+				chw<-fmt.Sprintf("Confirm\n%d\n",mid)
+			case "Heartbeat":
 				chmsg<-"Heartbeat"
 			case "Users":
 				users,_,err:=brd.ReadLine()
