@@ -146,6 +146,8 @@ func doLogin(){
 		fmt.Println("Login failed:"+sret)
 		return
 	}
+	outf,_:=os.Open("/tmp/output")
+	defer outf.Close()
 	chw:=make(chan string,10)
 	chmsg:=make(chan string,10)
 	go OnlineRead(brd,chw,chmsg)
@@ -159,6 +161,8 @@ func doLogin(){
 			case retmsg:=<-chmsg:
 				if retmsg!="Heartbeat"{
 					fmt.Println(retmsg)
+				//	outf.WriteString(retmsg)
+				//	outf.Sync()
 				}
 		}
 	}
@@ -172,7 +176,7 @@ func ProcInput(chw chan string){
 		fmt.Scanf("%d",&uid)
 		fmt.Println("Message:")
 		fmt.Scanf("%s",&msg)
-		output:=fmt.Sprintf("%d %d %d\n%s\n",uid,1,len(msg),msg)
+		output:=fmt.Sprintf("SendMsg\n%d %d %d\n%s\n",uid,1,len(msg),msg)
 		chw<-output
 	}
 }
@@ -217,7 +221,8 @@ func OnlineRead(brd *bufio.Reader, chw, chmsg chan string){
 				if err!=nil{
 					return
 				}
-				chmsg<-"Users\n"+string(users)
+
+				chmsg<-("Users\n"+string(users))
 			}
 		}else{
 			break

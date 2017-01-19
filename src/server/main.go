@@ -69,6 +69,7 @@ func (ouser *OLUser) ParseMsg(buf []byte, rd *bufio.Reader) (*dbop.MsgInfo, erro
 		if len(content) != filelen {
 			log.Println("Warning: read bytes != msg length")
 		}
+		msg.Content=string(content)
 	}
 	return &msg, nil
 }
@@ -163,7 +164,7 @@ func (ouser *OLUser) DoSendMsg() {
 		}
 		switch msg.Type {
 		case 1: // SendMsg\n MsgID(WindowID) MsgType MsgLen time\n Content\0"
-			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %s[%s]\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID,msg.SvrStamp) + msg.Content + "\n"))
+			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %d[%s]\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID,msg.SvrStamp) + msg.Content + "\n"))
 			//ouser.NetConn.Write(append([]byte("SendMsg\n"+fmt.Sprintf("%d\n", msg.MsgID)+msg.Content), 0))
 			//	case 2:
 			//	case 3:
@@ -175,11 +176,11 @@ func (ouser *OLUser) DoSendMsg() {
 func (ouser *OLUser) UpdateUser() {
 	users := "Users\n"
 	maplock.RLock()
-	for name, _ := range online_user {
+	for name, cuser:= range online_user {
 		if name == ouser.Username {
 			continue
 		}
-		users += fmt.Sprintf("%d:%s|",ouser.UID,name)
+		users += fmt.Sprintf("%d:%s|",cuser.UID,name)
 	}
 	maplock.RUnlock()
 	ouser.NetConn.Write([]byte(users+"\n"))
@@ -197,7 +198,7 @@ func (ouser *OLUser) WriteProc() {
 				return
 			case "Heartbeat":
 				ouser.NetConn.Write([]byte("Heartbeat\n"))
-			case "Send":
+			case "SendMsg":
 				// find in db
 				ouser.DoSendMsg()
 				//			case "Reply": // OK\n+WindowNum\n

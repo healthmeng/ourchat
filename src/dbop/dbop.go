@@ -52,7 +52,7 @@ func (info* UserInfo)ConfirmMsg(msgid int64)error{
 
 func (info* UserInfo)RegisterMsg(msginfo *MsgInfo) error{
 	msgtb:=fmt.Sprintf("msg%d",msginfo.ToUID)
-	query:=fmt.Sprintf("insert into %s ('type','content','fromuid','arrived','svrstamp') values ('%d','%s','%d','%d','%s')",msgtb,msginfo.Type,msginfo.Content,msginfo.FromUID,0,msginfo.SvrStamp)
+	query:=fmt.Sprintf("insert into %s (type,content,fromuid,arrived,svrstamp) values (%d,'%s',%d,%d,'%s')",msgtb,msginfo.Type,msginfo.Content,msginfo.FromUID,0,msginfo.SvrStamp)
 	if result,err:=db.Exec(query);err!=nil{
 		log.Println("Register message error:",err)
 		return err
@@ -65,6 +65,7 @@ func (info* UserInfo)RegisterMsg(msginfo *MsgInfo) error{
 func (info* UserInfo)GetUnsentMsg()([]MsgInfo,error){
 	msgtb:=fmt.Sprintf("msg%d",info.UID)
 	query:=fmt.Sprintf("select * from %s where arrived=0",msgtb)
+log.Println("send query:",query)
 	msgs:=make([]MsgInfo,0,20)
 	res,err:=db.Query(query)
 	if err!=nil{
@@ -73,7 +74,7 @@ func (info* UserInfo)GetUnsentMsg()([]MsgInfo,error){
 	}
 	for ;res.Next();{
 		var msg MsgInfo
-		err:=res.Scan(&msg.MsgID,&msg.Type,&msg.FromUID,
+		err:=res.Scan(&msg.MsgID,&msg.Type,&msg.Content,&msg.FromUID,
 					&msg.Arrived,&msg.SvrStamp)
 		if err!=nil{
 			log.Println("Parse db message error:",err)
