@@ -155,7 +155,7 @@ func doLogin(){
 	go ProcInput(chw)
 	for{
 		select{
-			case <-time.After(time.Minute*2):
+			case <-time.After(time.Second*90):
 				fmt.Println("Can't connect to server,try to logon again")
 				return
 			case retmsg:=<-chmsg:

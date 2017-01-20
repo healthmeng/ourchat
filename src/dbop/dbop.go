@@ -2,6 +2,7 @@ package dbop
 
 import (
 "database/sql"
+"strings"
 "log"
 "os"
 "errors"
@@ -53,6 +54,7 @@ func (info* UserInfo)ConfirmMsg(msgid int64)error{
 func (info* UserInfo)RegisterMsg(msginfo *MsgInfo) error{
 	msgtb:=fmt.Sprintf("msg%d",msginfo.ToUID)
 	query:=fmt.Sprintf("insert into %s (type,content,fromuid,arrived,svrstamp) values (%d,'%s',%d,%d,'%s')",msgtb,msginfo.Type,msginfo.Content,msginfo.FromUID,0,msginfo.SvrStamp)
+	query=strings.Replace(query,"\\","\\\\",-1)
 	if result,err:=db.Exec(query);err!=nil{
 		log.Println("Register message error:",err)
 		return err
