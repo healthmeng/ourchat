@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"bufio"
@@ -124,7 +124,7 @@ func (ouser *OLUser) ReadProc() {
 				//		rd.Reset(ouser.NetConn) can't reset, or may lose heatbeat
 				break
 			}else{
-				log.Println("msg:",msginfo.Content)
+			//	log.Println("msg:",msginfo.Content)
 			}
 			usr, err := dbop.LookforUID(msginfo.ToUID)
 			if err != nil {

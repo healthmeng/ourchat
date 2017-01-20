@@ -10,6 +10,8 @@ import (
 "os/exec"
 "os"
 // "compress/gzip"
+"runtime"
+"strings"
 )
 
 var svraddr string = "127.0.0.1"
@@ -27,14 +29,23 @@ type UserInfo struct{
 	RegTime string
 }
 
+func setEcho(enable bool){
+	if strings.ToLower(runtime.GOOS)!="windows"{
+		if enable{
+			exec.Command("/bin/stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
+			exec.Command("/bin/stty", "-F", "/dev/tty", "-echo").Run()
+		}else{
+			exec.Command("/bin/stty", "-F", "/dev/tty", "echo").Run()
+		}
+	}
+}
 
 func doRegister(){
 	info:=new (UserInfo)
 	fmt.Println("username:")
 	fmt.Scanf("%s",&info.Username)
 	var orgpass , again string
-	exec.Command("/bin/stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-	exec.Command("/bin/stty", "-F", "/dev/tty", "-echo").Run()
+	setEcho(false)
 	for{
 		fmt.Println("Password:")
 		fmt.Scanf("%s",&orgpass)
@@ -46,7 +57,7 @@ func doRegister(){
 			break
 		}
 	}
-	exec.Command("/bin/stty", "-F", "/dev/tty", "echo").Run()
+	setEcho(true)
 	sha:=sha256.Sum256([]byte(orgpass))
 	info.Password=""
 	for i:=0;i<sha256.Size;i++{
@@ -82,11 +93,10 @@ func doDel(){
 	fmt.Println("username:")
 	fmt.Scanf("%s",&info.Username)
 	var orgpass string
-	exec.Command("/bin/stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-	exec.Command("/bin/stty", "-F", "/dev/tty", "-echo").Run()
+	setEcho(false)
 	fmt.Println("Password:")
 	fmt.Scanf("%s",&orgpass)
-	exec.Command("/bin/stty", "-F", "/dev/tty", "echo").Run()
+	setEcho(true)
 	sha:=sha256.Sum256([]byte(orgpass))
 	info.Password=""
 	for i:=0;i<sha256.Size;i++{
@@ -116,11 +126,10 @@ func doLogin(){
 	fmt.Println("username:")
 	fmt.Scanf("%s",&info.Username)
 	var orgpass string
-	exec.Command("/bin/stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-	exec.Command("/bin/stty", "-F", "/dev/tty", "-echo").Run()
+	setEcho(false)
 	fmt.Println("Password:")
 	fmt.Scanf("%s",&orgpass)
-	exec.Command("/bin/stty", "-F", "/dev/tty", "echo").Run()
+	setEcho(true)
 	sha:=sha256.Sum256([]byte(orgpass))
 	info.Password=""
 	for i:=0;i<sha256.Size;i++{
