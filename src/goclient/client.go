@@ -31,7 +31,7 @@ type UserInfo struct{
 
 func setEcho(enable bool){
 	if strings.ToLower(runtime.GOOS)!="windows"{
-		if enable{
+		if !enable{
 			exec.Command("/bin/stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
 			exec.Command("/bin/stty", "-F", "/dev/tty", "-echo").Run()
 		}else{
