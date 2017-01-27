@@ -131,11 +131,33 @@ func FindUser(username string) (* UserInfo,error){
 	return nil,nil
 }
 
+func ListUsers()([]*UserInfo,error){
+	ret:=make([]*UserInfo,0,20)
+	query:="select * from users"
+	res,err:=db.Query(query)
+	if err!=nil{
+		log.Println("Query all users error:",err)
+		return nil,err
+	}
+	for res.Next(){
+		info:=new(UserInfo)
+		if err:=res.Scan(&info.UID,	&info.Username,
+				&info.Password,&info.Descr,&info.Face,
+				&info.Phone,&info.RegTime);err!=nil{
+			log.Println("Get object from db result  error:",err)
+			return nil,err
+		}else{
+			ret=append(ret,info)
+		}
+	}
+	return ret,nil
+}
+
 func LookforUID(uid int64) (* UserInfo,error){
 	query:=fmt.Sprintf("select * from users where uid='%d'",uid)
 	res,err:=db.Query(query)
 	if err!=nil{
-		fmt.Println("find user query error:",err)
+		log.Println("find user query error:",err)
 		return nil,err
 	}
 	if res.Next(){

@@ -200,6 +200,7 @@ func (ouser *OLUser) WriteProc() {
 				return
 			case "Heartbeat":
 				ouser.NetConn.Write([]byte("Heartbeat\n"))
+			//case "UserInfo":
 			case "SendMsg":
 				// find in db
 				ouser.DoSendMsg()
@@ -328,6 +329,16 @@ func procConn(conn net.Conn) {
 			conn.Write([]byte("OK" + "\n"))
 		}
 
+	case "GetUserInfo":
+		usrlst,err:=dbop.ListUsers()
+		if err!=nil{
+			conn.Write([]byte("ERROR:"+err.Error()))
+		}else{
+			conn.Write([]byte(fmt.Sprintf("UserList\n%d\n",len(usrlst))))
+			for _,usr:=range(usrlst){
+				conn.Write([]byte(fmt.Sprintf("id:%d;name:%s;descr:%s;face:%s;phone:%s\n",usr.UID,usr.Username,usr.Descr,usr.Face,usr.Phone)))
+			}
+		}
 	case "Login": // keep heartbeat, if read or write failed or timeout, treat as logout; pic and wav，use tcp(COPYN)
 		/*
 			<---
