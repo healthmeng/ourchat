@@ -9,7 +9,10 @@ import (
 //"encoding/json"
 "os/exec"
 "os"
+"strconv"
 // "compress/gzip"
+"runtime"
+"strings"
 )
 
 var svraddr string = "127.0.0.1"
@@ -27,14 +30,50 @@ type UserInfo struct{
 	RegTime string
 }
 
+func setEcho(enable bool){
+	if strings.ToLower(runtime.GOOS)!="windows"{
+		if !enable{
+			exec.Command("/bin/stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
+			exec.Command("/bin/stty", "-F", "/dev/tty", "-echo").Run()
+		}else{
+			exec.Command("/bin/stty", "-F", "/dev/tty", "echo").Run()
+		}
+	}
+}
+
+func doGetUsers(){
+	conn,err:=net.Dial("tcp",connstr)
+	if err!=nil{
+		fmt.Println("Connect to server failed:",err)
+		return
+	}
+	defer conn.Close()
+	conn.Write([]byte("GetUserInfo\n"))
+	rd:=bufio.NewReader(conn)
+	buf,_,err:=rd.ReadLine()
+	if err!=nil{
+		fmt.Println("GetUserinfo error")
+		return
+	}
+	if string(buf)=="UserList"{
+		lines,_,err:=rd.ReadLine()
+		if err!=nil{
+			return
+		}
+		nLine,_:=strconv.Atoi(string(lines))
+		for i:=0;i<nLine;i++{
+			buf,_,_:=rd.ReadLine()
+			fmt.Println(string(buf))
+		}
+	}
+}
 
 func doRegister(){
 	info:=new (UserInfo)
 	fmt.Println("username:")
 	fmt.Scanf("%s",&info.Username)
 	var orgpass , again string
-	exec.Command("/bin/stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-	exec.Command("/bin/stty", "-F", "/dev/tty", "-echo").Run()
+	setEcho(false)
 	for{
 		fmt.Println("Password:")
 		fmt.Scanf("%s",&orgpass)
@@ -46,7 +85,7 @@ func doRegister(){
 			break
 		}
 	}
-	exec.Command("/bin/stty", "-F", "/dev/tty", "echo").Run()
+	setEcho(true)
 	sha:=sha256.Sum256([]byte(orgpass))
 	info.Password=""
 	for i:=0;i<sha256.Size;i++{
@@ -82,11 +121,10 @@ func doDel(){
 	fmt.Println("username:")
 	fmt.Scanf("%s",&info.Username)
 	var orgpass string
-	exec.Command("/bin/stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-	exec.Command("/bin/stty", "-F", "/dev/tty", "-echo").Run()
+	setEcho(false)
 	fmt.Println("Password:")
 	fmt.Scanf("%s",&orgpass)
-	exec.Command("/bin/stty", "-F", "/dev/tty", "echo").Run()
+	setEcho(true)
 	sha:=sha256.Sum256([]byte(orgpass))
 	info.Password=""
 	for i:=0;i<sha256.Size;i++{
@@ -116,11 +154,10 @@ func doLogin(){
 	fmt.Println("username:")
 	fmt.Scanf("%s",&info.Username)
 	var orgpass string
-	exec.Command("/bin/stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-	exec.Command("/bin/stty", "-F", "/dev/tty", "-echo").Run()
+	setEcho(false)
 	fmt.Println("Password:")
 	fmt.Scanf("%s",&orgpass)
-	exec.Command("/bin/stty", "-F", "/dev/tty", "echo").Run()
+	setEcho(true)
 	sha:=sha256.Sum256([]byte(orgpass))
 	info.Password=""
 	for i:=0;i<sha256.Size;i++{
@@ -155,7 +192,7 @@ func doLogin(){
 	go ProcInput(chw)
 	for{
 		select{
-			case <-time.After(time.Minute*2):
+			case <-time.After(time.Second*90):
 				fmt.Println("Can't connect to server,try to logon again")
 				return
 			case retmsg:=<-chmsg:
@@ -253,6 +290,8 @@ func main(){
 		doDel()
 	} else if os.Args[1]=="login"{
 		doLogin()
+	}else if os.Args[1]=="GetUsers"{
+		doGetUsers()
 	}else{
 		fmt.Println("client register\nclient del\nclient login")
 	}
