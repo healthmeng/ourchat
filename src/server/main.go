@@ -287,7 +287,7 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 		case <-time.After(time.Second * 120):
 			oluser.DoOffline()
 			return
-			// no message in 60 seconds, timeout
+			// no message in 120 seconds, timeout
 			// do offline
 		}
 	}
