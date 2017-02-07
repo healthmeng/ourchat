@@ -146,6 +146,7 @@ func (ouser *OLUser) ReadProc() {
 		case "Offline":
 			// imform all online users reload user info
 			ouser.DoOffline()
+			return
 		default:
 			log.Println("Unknown message type:", cmd)
 			//	rd.Reset(ouser.NetConn)
@@ -220,7 +221,7 @@ func (ouser *OLUser) DoOffline() {
 	maplock.Lock()
 	delete(online_user, ouser.Username) //should be done in connection routine
 	maplock.Unlock()
-	ouser.Newjob <- "Offline\n"
+	ouser.Newjob <- "Offline\n" // quit write proc, \n to be splitted
 	///////////////
 
 	maplock.RLock()
@@ -269,6 +270,7 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 		case <-oluser.CtrlIn:
 			// do offline
 			oluser.DoOffline()
+			return
 		case msg := <-oluser.RdMsg:
 			/* 	1. get send response
 			   	2. get heart beat
