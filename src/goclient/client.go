@@ -183,8 +183,7 @@ func doLogin(){
 		fmt.Println("Login failed:"+sret)
 		return
 	}
-	outf,_:=os.Open("/tmp/output")
-	defer outf.Close()
+
 	chw:=make(chan string,10)
 	chmsg:=make(chan string,10)
 	go OnlineRead(brd,chw,chmsg)
@@ -198,8 +197,6 @@ func doLogin(){
 			case retmsg:=<-chmsg:
 				if retmsg!="Heartbeat"{
 					fmt.Println(retmsg)
-				//	outf.WriteString(retmsg)
-				//	outf.Sync()
 				}
 		}
 	}
