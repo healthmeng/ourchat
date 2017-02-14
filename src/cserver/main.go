@@ -348,7 +348,7 @@ func procConn(conn net.Conn) {
 					username\n
 					passwdsha256\n
 			--->
-					OK\n | ERROR:err\n(close)
+					OK\nID\n | ERROR:err\n(close)
 					go routine (read,write,chan)
 		*/
 		usr, _, err := rd.ReadLine()
@@ -382,7 +382,7 @@ func procConn(conn net.Conn) {
 			conn.Write([]byte("ERROR: Bad user/passwd\n"))
 			return
 		}
-		conn.Write([]byte("OK\n"))
+		conn.Write([]byte(fmt.Sprintf("OK\n%d\n",uinfo.UID)))
 		//	*pClose=false
 		DoOnline(uinfo, conn)
 

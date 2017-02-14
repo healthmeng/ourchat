@@ -183,6 +183,8 @@ func doLogin(){
 		fmt.Println("Login failed:"+sret)
 		return
 	}
+	ret,_,_=brd.ReadLine()
+	fmt.Println("Your uid:",string(ret))
 
 	chw:=make(chan string,10)
 	chmsg:=make(chan string,10)
