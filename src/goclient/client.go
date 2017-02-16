@@ -41,33 +41,6 @@ func setEcho(enable bool){
 	}
 }
 
-func doGetUsers(){
-	conn,err:=net.Dial("tcp",connstr)
-	if err!=nil{
-		fmt.Println("Connect to server failed:",err)
-		return
-	}
-	defer conn.Close()
-	conn.Write([]byte("GetUserInfo\n"))
-	rd:=bufio.NewReader(conn)
-	buf,_,err:=rd.ReadLine()
-	if err!=nil{
-		fmt.Println("GetUserinfo error")
-		return
-	}
-	if string(buf)=="UserList"{
-		lines,_,err:=rd.ReadLine()
-		if err!=nil{
-			return
-		}
-		nLine,_:=strconv.Atoi(string(lines))
-		for i:=0;i<nLine;i++{
-			buf,_,_:=rd.ReadLine()
-			fmt.Println(string(buf))
-		}
-	}
-}
-
 func doRegister(){
 	info:=new (UserInfo)
 	fmt.Println("username:")
@@ -219,6 +192,7 @@ func ProcInput(chw chan string){
 
 func OnlineWrite(conn net.Conn, chw chan string){
 	tm:=time.NewTimer(time.Minute)
+	conn.Write([]byte("GetUserInfo\n"))
 	for{
 		select{
 		case wr:=<-chw:
@@ -258,10 +232,27 @@ func OnlineRead(brd *bufio.Reader, chw, chmsg chan string){
 				if err!=nil{
 					return
 				}
-
 				chmsg<-("Users\n"+string(users))
+			case "UserList":
+				if count,_,err:=brd.ReadLine();err==nil{
+					cnt,er:=strconv.Atoi(string(count))
+					if er==nil{
+						println("Total ",cnt,"users.")
+					}else{
+						fmt.Println(er)
+						return
+					}
+					for i:=0;i<cnt;i++{
+						line,_,err:=brd.ReadLine()
+						if err!=nil{
+							fmt.Println("Read error:",err)
+							break
+						}
+						fmt.Println(string(line))
+					}
+				}
 			}
-		}else{
+		}else{ // unknown message type
 			break
 		}
 	}
@@ -289,8 +280,6 @@ func main(){
 		doDel()
 	} else if os.Args[1]=="login"{
 		doLogin()
-	}else if os.Args[1]=="GetUsers"{
-		doGetUsers()
 	}else{
 		fmt.Println("client register\nclient del\nclient login")
 	}

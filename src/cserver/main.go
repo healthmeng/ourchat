@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"bufio"
@@ -69,7 +69,7 @@ func (ouser *OLUser) ParseMsg(buf []byte, rd *bufio.Reader) (*dbop.MsgInfo, erro
 		if len(content) != filelen {
 			log.Println("Warning: read bytes != msg length")
 		}
-		msg.Content=string(content)
+		msg.Content = string(content)
 	}
 	return &msg, nil
 }
@@ -108,9 +108,24 @@ func (ouser *OLUser) ReadProc() {
 				}
 				ouser.Sendlock.Unlock()
 			}
-			ouser.RdMsg <- 1
+			//		ouser.RdMsg <- 1
 		case "Heartbeat":
-			ouser.RdMsg <- 2
+			ouser.Newjob <- "Heartbeat"
+			//		ouser.RdMsg <- 2
+
+		case "GetUserInfo":
+			ouser.Newjob <- "UsrUpdate"
+		/*	usrlst,err:=dbop.ListUsers()
+			if err!=nil{
+				conn.Write([]byte("ERROR:"+err.Error()))
+			}else{
+				conn.Write([]byte(fmt.Sprintf("UserList\n%d\n",len(usrlst))))
+				for _,usr:=range(usrlst){
+					conn.Write([]byte(fmt.Sprintf("id:%d;name:%s;descr:%s;face:%s;phone:%s\n",usr.UID,usr.Username,usr.Descr,usr.Face,usr.Phone)))
+				}
+			}
+		*/
+
 		case "SendMsg":
 			buf, _, err := rd.ReadLine()
 			if err != nil {
@@ -123,8 +138,8 @@ func (ouser *OLUser) ReadProc() {
 				log.Println("Error client message format")
 				//		rd.Reset(ouser.NetConn) can't reset, or may lose heatbeat
 				break
-			}else{
-			//	log.Println("msg:",msginfo.Content)
+			} else {
+				//	log.Println("msg:",msginfo.Content)
 			}
 			usr, err := dbop.LookforUID(msginfo.ToUID)
 			if err != nil {
@@ -167,7 +182,7 @@ func (ouser *OLUser) DoSendMsg() {
 		}
 		switch msg.Type {
 		case 1: // SendMsg\n MsgID(WindowID) MsgType MsgLen time\n Content\0"
-			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %d[%s]\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID,msg.SvrStamp) + msg.Content + "\n"))
+			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %d[%s]\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID, msg.SvrStamp) + msg.Content + "\n"))
 			//ouser.NetConn.Write(append([]byte("SendMsg\n"+fmt.Sprintf("%d\n", msg.MsgID)+msg.Content), 0))
 			//	case 2:
 			//	case 3:
@@ -179,14 +194,14 @@ func (ouser *OLUser) DoSendMsg() {
 func (ouser *OLUser) UpdateUser() {
 	users := "Users\n"
 	maplock.RLock()
-	for name, cuser:= range online_user {
+	for name, cuser := range online_user {
 		if name == ouser.Username {
 			continue
 		}
-		users += fmt.Sprintf("%d:%s|",cuser.UID,name)
+		users += fmt.Sprintf("%d:%s|", cuser.UID, name)
 	}
 	maplock.RUnlock()
-	ouser.NetConn.Write([]byte(users+"\n"))
+	ouser.NetConn.Write([]byte(users + "\n"))
 }
 
 func (ouser *OLUser) WriteProc() {
@@ -210,6 +225,16 @@ func (ouser *OLUser) WriteProc() {
 			case "Refresh":
 				//////////
 				ouser.UpdateUser()
+			case "UsrUpdate":
+				usrlst, err := dbop.ListUsers()
+				if err != nil {
+					ouser.NetConn.Write([]byte("ERROR:" + err.Error()))
+				} else {
+					ouser.NetConn.Write([]byte(fmt.Sprintf("UserList\n%d\n", len(usrlst))))
+					for _, usr := range usrlst {
+						ouser.NetConn.Write([]byte(fmt.Sprintf("id:%d;name:%s;descr:%s;face:%s;phone:%s\n", usr.UID, usr.Username, usr.Descr, usr.Face, usr.Phone)))
+					}
+				}
 			}
 		case <-time.After(time.Minute):
 			ouser.DoSendMsg()
@@ -257,13 +282,12 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 	go oluser.WriteProc()
 	////////////////
 	// todo: inform all other online users to send new user online msg
-	for name, cuser:= range online_user {
+	for name, cuser := range online_user {
 		if name == oluser.Username {
 			continue
 		}
-		cuser.Newjob<-"Refresh"
+		cuser.Newjob <- "Refresh"
 	}
-
 
 	for {
 		select {
@@ -272,16 +296,15 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 			oluser.DoOffline()
 			return
 		case msg := <-oluser.RdMsg:
-			/* 	1. get send response
-			   	2. get heart beat
-			   	3. get client's new message
+			/* 	//1. get send response
+			   	//2. get heart beat
+			   	//3. get client's new message
 			   	4. get offline inform
 			*/
 			switch msg {
-			case 1: // confirm ok
-			case 2: // heartbeat
-				oluser.Newjob <- "Heartbeat"
-			case 3:
+			//	case 1: // confirm ok
+			//	case 2: // heartbeat
+			//	case 3:
 			//	break
 			case 4:
 				oluser.DoOffline()
@@ -331,16 +354,6 @@ func procConn(conn net.Conn) {
 			conn.Write([]byte("OK" + "\n"))
 		}
 
-	case "GetUserInfo":
-		usrlst,err:=dbop.ListUsers()
-		if err!=nil{
-			conn.Write([]byte("ERROR:"+err.Error()))
-		}else{
-			conn.Write([]byte(fmt.Sprintf("UserList\n%d\n",len(usrlst))))
-			for _,usr:=range(usrlst){
-				conn.Write([]byte(fmt.Sprintf("id:%d;name:%s;descr:%s;face:%s;phone:%s\n",usr.UID,usr.Username,usr.Descr,usr.Face,usr.Phone)))
-			}
-		}
 	case "Login": // keep heartbeat, if read or write failed or timeout, treat as logout; pic and wav，use tcp(COPYN)
 		/*
 			<---
@@ -382,7 +395,7 @@ func procConn(conn net.Conn) {
 			conn.Write([]byte("ERROR: Bad user/passwd\n"))
 			return
 		}
-		conn.Write([]byte(fmt.Sprintf("OK\n%d\n",uinfo.UID)))
+		conn.Write([]byte(fmt.Sprintf("OK\n%d\n", uinfo.UID)))
 		//	*pClose=false
 		DoOnline(uinfo, conn)
 
