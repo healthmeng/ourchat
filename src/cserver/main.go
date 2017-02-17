@@ -183,8 +183,7 @@ func (ouser *OLUser) DoSendMsg() {
 		}
 		switch msg.Type {
 		case 1: // SendMsg\n MsgID(WindowID) MsgType MsgLen time\n Content\n"
-			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %d[%s]\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID, msg.SvrStamp) + msg.Content))
-			//ouser.NetConn.Write(append([]byte("SendMsg\n"+fmt.Sprintf("%d\n", msg.MsgID)+msg.Content), 0))
+			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %d [%s]\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID, msg.SvrStamp) + msg.Content))
 			//	case 2:
 			//	case 3:
 		}
@@ -205,7 +204,20 @@ func (ouser *OLUser) UpdateUser() {
 	ouser.NetConn.Write([]byte(users + "\n"))
 }
 
+func (ouser *OLUser) SendUserList(){
+	usrlst, err := dbop.ListUsers()
+	if err != nil {
+		ouser.NetConn.Write([]byte("ERROR:" + err.Error()))
+	} else {
+		ouser.NetConn.Write([]byte(fmt.Sprintf("UserList\n%d\n", len(usrlst))))
+		for _, usr := range usrlst {
+			ouser.NetConn.Write([]byte(fmt.Sprintf("id:%d;name:%s;descr:%s;face:%s;phone:%s\n", usr.UID, usr.Username, usr.Descr, usr.Face, usr.Phone)))
+		}
+	}
+}
+
 func (ouser *OLUser) WriteProc() {
+	ouser.SendUserList()
 	ouser.UpdateUser() // send all users info to client
 	ouser.DoSendMsg()  // try to send offline messages to client
 	for {
@@ -227,15 +239,7 @@ func (ouser *OLUser) WriteProc() {
 				//////////
 				ouser.UpdateUser()
 			case "UsrUpdate":
-				usrlst, err := dbop.ListUsers()
-				if err != nil {
-					ouser.NetConn.Write([]byte("ERROR:" + err.Error()))
-				} else {
-					ouser.NetConn.Write([]byte(fmt.Sprintf("UserList\n%d\n", len(usrlst))))
-					for _, usr := range usrlst {
-						ouser.NetConn.Write([]byte(fmt.Sprintf("id:%d;name:%s;descr:%s;face:%s;phone:%s\n", usr.UID, usr.Username, usr.Descr, usr.Face, usr.Phone)))
-					}
-				}
+				ouser.SendUserList()
 			}
 		case <-time.After(time.Minute):
 			ouser.DoSendMsg()

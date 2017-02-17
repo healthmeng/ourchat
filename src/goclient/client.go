@@ -192,7 +192,6 @@ func ProcInput(chw chan string){
 
 func OnlineWrite(conn net.Conn, chw chan string){
 	tm:=time.NewTimer(time.Minute)
-	conn.Write([]byte("GetUserInfo\n"))
 	for{
 		select{
 		case wr:=<-chw:
