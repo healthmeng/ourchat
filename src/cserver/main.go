@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"bufio"
@@ -82,6 +82,7 @@ func (ouser *OLUser) ReadProc() {
 			return
 		}
 		cmd := string(cmdbuf)
+fmt.Println("get command:",string(cmdbuf))
 		switch cmd {
 		case "Confirm": // confirm\n ID\n
 			msgbuf, _, err := rd.ReadLine()
@@ -181,8 +182,8 @@ func (ouser *OLUser) DoSendMsg() {
 			continue
 		}
 		switch msg.Type {
-		case 1: // SendMsg\n MsgID(WindowID) MsgType MsgLen time\n Content\0"
-			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %d[%s]\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID, msg.SvrStamp) + msg.Content + "\n"))
+		case 1: // SendMsg\n MsgID(WindowID) MsgType MsgLen time\n Content\n"
+			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %d[%s]\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID, msg.SvrStamp) + msg.Content))
 			//ouser.NetConn.Write(append([]byte("SendMsg\n"+fmt.Sprintf("%d\n", msg.MsgID)+msg.Content), 0))
 			//	case 2:
 			//	case 3:
