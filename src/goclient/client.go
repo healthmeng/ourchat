@@ -186,10 +186,7 @@ func ProcInput(chw chan string){
 		fmt.Scanf("%d",&uid)
 		fmt.Println("Message:")
 		fmt.Scanf("%s",&msg)
-		if gbmsg,err:=convgbk.UTF2GB(msg); err==nil{
-			msg=gbmsg
-		}
-		fmt.Println("send:",msg)
+		msg,_=convgbk.UTF2GB(msg)
 		output:=fmt.Sprintf("SendMsg\n%d %d %d\n%s\n",uid,1,len(msg),msg)
 		chw<-output
 	}
@@ -200,7 +197,6 @@ func OnlineWrite(conn net.Conn, chw chan string){
 	for{
 		select{
 		case wr:=<-chw:
-		fmt.Println("now write:",wr)
 			if _,err:=conn.Write([]byte(wr));err!=nil{
 			fmt.Println("write error!")
 				return
@@ -232,12 +228,8 @@ func OnlineRead(brd *bufio.Reader, chw, chmsg chan string){
 				if err!=nil{
 					return
 				}
-				strdetail:=string(detail)
-				var strmsg string
-				if strmsg,err=convgbk.GB2UTF(strdetail);err!=nil{
-					strmsg=strdetail
-				}
-				chmsg<-fmt.Sprintf("%d %s :%s",from,tmstamp,strmsg)
+				strdetail,_:=convgbk.GB2UTF(string(detail))
+				chmsg<-fmt.Sprintf("%d %s :%s",from,tmstamp,strdetail)
 				chw<-fmt.Sprintf("Confirm\n%d\n",mid)
 			case "Heartbeat":
 				chmsg<-"Heartbeat"

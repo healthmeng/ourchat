@@ -182,7 +182,6 @@ func (ouser *OLUser) DoSendMsg() {
 		}
 		switch msg.Type {
 		case 1: // SendMsg\n MsgID(WindowID) MsgType MsgLen time\n Content\n"
-			fmt.Println("msgcontent:", msg.Content)
 			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %d %s\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID, msg.SvrStamp) + msg.Content+"\n"))
 			//	case 2:
 			//	case 3:

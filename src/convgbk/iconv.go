@@ -55,22 +55,21 @@ int gbutf8(int c, char* src, char* dest, int maxsize){
 import "C"
 
 func UTF2GB(src string) (string,error){
-	slen:=len(src)+1
-	dst:=make([]byte,slen,slen)
+	slen:=len(src)
+	dst:=make([]byte,slen*3,slen*3)
 	cptr:=(*C.char)((unsafe.Pointer)(&dst[0]))
-	if ret:=C.gbutf8(C.int(0),C.CString(src),cptr,C.int(slen));ret!=0{
-		return "",errors.New("Convert error")
+	if ret:=C.gbutf8(C.int(0),C.CString(src),cptr,C.int(slen*3));ret!=0{
+		return src,errors.New("Convert error")
 	}
 	return C.GoString(cptr),nil
 }
 
 func GB2UTF(src string)(string,error){
-	slen:=len(src)+1
-	dst:=make([]byte,slen,slen)
+	slen:=len(src)
+	dst:=make([]byte,slen*3,slen*3)
 	cptr:=(*C.char)((unsafe.Pointer)(&dst[0]))
-	if ret:=C.gbutf8(C.int(1),C.CString(src),cptr,C.int(slen));ret!=0{
-		return "",errors.New("Convert error")
+	if ret:=C.gbutf8(C.int(1),C.CString(src),cptr,C.int(slen*3));ret!=0{
+		return src ,errors.New("Convert error")
 	}
 	return C.GoString(cptr),nil
 }
-

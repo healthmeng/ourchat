@@ -55,14 +55,10 @@ func (info* UserInfo)ConfirmMsg(msgid int64)error{
 func (info* UserInfo)RegisterMsg(msginfo *MsgInfo) error{
 	msgtb:=fmt.Sprintf("msg%d",msginfo.ToUID)
 	var query string
-	tranutf8:=false
 	if msginfo.Type==1{ // text
-		if tmp,err:=convgbk.GB2UTF(msginfo.Content);err==nil{
-			query=fmt.Sprintf("insert into %s (type,content,fromuid,arrived,svrstamp) values (%d,'%s',%d,%d,'%s')",msgtb,msginfo.Type,tmp,msginfo.FromUID,0,msginfo.SvrStamp)
-			tranutf8=true
-		}
-	}
-	if tranutf8==false{
+		tmp,_:=convgbk.GB2UTF(msginfo.Content)
+		query=fmt.Sprintf("insert into %s (type,content,fromuid,arrived,svrstamp) values (%d,'%s',%d,%d,'%s')",msgtb,msginfo.Type,tmp,msginfo.FromUID,0,msginfo.SvrStamp)
+	}else {
 		query=fmt.Sprintf("insert into %s (type,content,fromuid,arrived,svrstamp) values (%d,'%s',%d,%d,'%s')",msgtb,msginfo.Type,msginfo.Content,msginfo.FromUID,0,msginfo.SvrStamp)
 	}
 	query=strings.Replace(query,"\\","\\\\",-1)
@@ -91,6 +87,9 @@ func (info* UserInfo)GetUnsentMsg()([]MsgInfo,error){
 		if err!=nil{
 			log.Println("Parse db message error:",err)
 			return nil,err
+		}
+		if msg.Type==1{
+			msg.Content,_=convgbk.UTF2GB(msg.Content)
 		}
 		msg.ToUID=info.UID
 		msgs=append(msgs,msg)
@@ -126,7 +125,7 @@ func FindUser(username string) (* UserInfo,error){
 	query:=fmt.Sprintf("select * from users where username='%s'",username)
 	res,err:=db.Query(query)
 	if err!=nil{
-		fmt.Println("find user query error:",err)
+		log.Println("find user query error:",err)
 		return nil,err
 	}
 	if res.Next(){
