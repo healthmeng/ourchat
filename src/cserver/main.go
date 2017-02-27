@@ -183,7 +183,7 @@ func (ouser *OLUser) DoSendMsg() {
 		}
 		switch msg.Type {
 		case 1: // SendMsg\n MsgID(WindowID) MsgType MsgLen time\n Content\n"
-			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %d [%s]\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID, msg.SvrStamp) + msg.Content))
+			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %d [%s]\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID, msg.SvrStamp) + msg.Content+"\n"))
 			//	case 2:
 			//	case 3:
 		}
@@ -211,7 +211,7 @@ func (ouser *OLUser) SendUserList(){
 	} else {
 		ouser.NetConn.Write([]byte(fmt.Sprintf("UserList\n%d\n", len(usrlst))))
 		for _, usr := range usrlst {
-			ouser.NetConn.Write([]byte(fmt.Sprintf("id:%d;name:%s;descr:%s;face:%s;phone:%s\n", usr.UID, usr.Username, usr.Descr, usr.Face, usr.Phone)))
+			ouser.NetConn.Write([]byte(fmt.Sprintf("%d;%s;%s;%s;%s\n", usr.UID, usr.Username, usr.Descr, usr.Face, usr.Phone)))
 		}
 	}
 }
