@@ -7,6 +7,7 @@ import (
 "os"
 "errors"
 "fmt"
+"convgbk"
 _"github.com/Go-SQL-Driver/MySQL"
 "time"
 )
@@ -53,7 +54,17 @@ func (info* UserInfo)ConfirmMsg(msgid int64)error{
 
 func (info* UserInfo)RegisterMsg(msginfo *MsgInfo) error{
 	msgtb:=fmt.Sprintf("msg%d",msginfo.ToUID)
-	query:=fmt.Sprintf("insert into %s (type,content,fromuid,arrived,svrstamp) values (%d,'%s',%d,%d,'%s')",msgtb,msginfo.Type,msginfo.Content,msginfo.FromUID,0,msginfo.SvrStamp)
+	var query string
+	tranutf8:=false
+	if msginfo.Type==1{ // text
+		if tmp,err:=convgbk.GB2UTF(msginfo.Content);err==nil{
+			query=fmt.Sprintf("insert into %s (type,content,fromuid,arrived,svrstamp) values (%d,'%s',%d,%d,'%s')",msgtb,msginfo.Type,tmp,msginfo.FromUID,0,msginfo.SvrStamp)
+			tranutf8=true
+		}
+	}
+	if tranutf8==false{
+		query=fmt.Sprintf("insert into %s (type,content,fromuid,arrived,svrstamp) values (%d,'%s',%d,%d,'%s')",msgtb,msginfo.Type,msginfo.Content,msginfo.FromUID,0,msginfo.SvrStamp)
+	}
 	query=strings.Replace(query,"\\","\\\\",-1)
 	if result,err:=db.Exec(query);err!=nil{
 		log.Println("Register message error:",err)
@@ -187,7 +198,8 @@ func AddUser(info *UserInfo) error{
 		return err
 	}else{
 		info.UID ,_= result.LastInsertId()
-		query=fmt.Sprintf("create table `msg%d` (`msgid` int(11) not null AUTO_INCREMENT, `type` smallint(3) not null, `content` varchar(1024), `fromuid` int(11) not null, `arrived` tinyint(1) not null, `svrstamp` datetime, PRIMARY KEY(`msgid`)) default character set=utf8",info.UID)
+		query=fmt.Sprintf("create table `msg%d` (`msgid` int(11) not null AUTO_INCREMENT, `type` smallint(3) not null, `content` varchar(1024), `fromuid` int(11) not null, `arrived` tinyint(1) not null, `svrstamp` datetime, PRIMARY KEY(`msgid`)) default charset=utf8",info.UID)
+		//query=fmt.Sprintf("create table `msg%d` (`msgid` int(11) not null AUTO_INCREMENT, `type` smallint(3) not null, `content` varchar(1024), `fromuid` int(11) not null, `arrived` tinyint(1) not null, `svrstamp` datetime, PRIMARY KEY(`msgid`)) default character set=utf8",info.UID)
 		if _,err:=db.Exec(query);err!=nil{
 			log.Println("Create msg table error:",err)
 			return err

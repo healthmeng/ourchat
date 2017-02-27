@@ -13,6 +13,7 @@ import (
 // "compress/gzip"
 "runtime"
 "strings"
+"convgbk"
 )
 
 var svraddr string = "127.0.0.1"
@@ -185,6 +186,10 @@ func ProcInput(chw chan string){
 		fmt.Scanf("%d",&uid)
 		fmt.Println("Message:")
 		fmt.Scanf("%s",&msg)
+		if gbmsg,err:=convgbk.UTF2GB(msg); err==nil{
+			msg=gbmsg
+		}
+		fmt.Println("send:",msg)
 		output:=fmt.Sprintf("SendMsg\n%d %d %d\n%s\n",uid,1,len(msg),msg)
 		chw<-output
 	}
@@ -195,7 +200,9 @@ func OnlineWrite(conn net.Conn, chw chan string){
 	for{
 		select{
 		case wr:=<-chw:
+		fmt.Println("now write:",wr)
 			if _,err:=conn.Write([]byte(wr));err!=nil{
+			fmt.Println("write error!")
 				return
 			}
 		case <-tm.C:
@@ -217,12 +224,20 @@ func OnlineRead(brd *bufio.Reader, chw, chmsg chan string){
 				if err!=nil{
 					return
 				}
-				var mid,mtype,mlen int
-				var from  string;
-				fmt.Sscanf(string(info),"%d%d%d%s",&mid,&mtype,&mlen,&from)
+				var mid,mtype,mlen,from int
+				var  tmstamp string;
+				fmt.Sscanf(string(info),"%d%d%d%d%s",&mid,&mtype,&mlen,&from,&tmstamp)
 				/////
 				detail,_,err:=brd.ReadLine()
-				chmsg<-from+":"+string(detail)
+				if err!=nil{
+					return
+				}
+				strdetail:=string(detail)
+				var strmsg string
+				if strmsg,err=convgbk.GB2UTF(strdetail);err!=nil{
+					strmsg=strdetail
+				}
+				chmsg<-fmt.Sprintf("%d %s :%s",from,tmstamp,strmsg)
 				chw<-fmt.Sprintf("Confirm\n%d\n",mid)
 			case "Heartbeat":
 				chmsg<-"Heartbeat"
