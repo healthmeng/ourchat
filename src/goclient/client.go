@@ -171,8 +171,12 @@ func doLogin(){
 				fmt.Println("Can't connect to server,try to logon again")
 				return
 			case retmsg:=<-chmsg:
+				if retmsg=="Closed"{
+					fmt.Println("Remote connection closed.")
+					return
+				}
 				if retmsg!="Heartbeat"{
-					fmt.Println("receive:",time.Now(),retmsg)
+					fmt.Println("receive:",time.Now(),":",retmsg)
 				}
 		}
 	}
@@ -259,7 +263,8 @@ func OnlineRead(brd *bufio.Reader, chw, chmsg chan string){
 					}
 				}
 			}
-		}else{ // unknown message type
+		}else{ // read error 
+			chmsg<-"Closed"
 			break
 		}
 	}
