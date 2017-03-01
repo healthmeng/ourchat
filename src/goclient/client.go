@@ -172,7 +172,7 @@ func doLogin(){
 				return
 			case retmsg:=<-chmsg:
 				if retmsg!="Heartbeat"{
-					fmt.Println(retmsg)
+					fmt.Println("receive:",time.Now(),retmsg)
 				}
 		}
 	}
@@ -202,6 +202,7 @@ func OnlineWrite(conn net.Conn, chw chan string){
 				return
 			}
 		case <-tm.C:
+			fmt.Println("send hearbeat:",time.Now())
 			if _,err:=conn.Write([]byte("Heartbeat\n"));err!=nil{
 				return
 			}

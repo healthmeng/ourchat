@@ -108,10 +108,10 @@ func (ouser *OLUser) ReadProc() {
 				}
 				ouser.Sendlock.Unlock()
 			}
-			//		ouser.RdMsg <- 1
+					ouser.RdMsg <- 1
 		case "Heartbeat":
 			ouser.Newjob <- "Heartbeat"
-			//		ouser.RdMsg <- 2
+					ouser.RdMsg <- 2
 
 		case "GetUserInfo":
 			ouser.Newjob <- "UsrUpdate"
@@ -125,7 +125,7 @@ func (ouser *OLUser) ReadProc() {
 				}
 			}
 		*/
-
+			ouser.RdMsg<-5
 		case "SendMsg":
 			buf, _, err := rd.ReadLine()
 			if err != nil {
@@ -303,7 +303,8 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 			/* 	//1. get send response
 			   	//2. get heart beat
 			   	//3. get client's new message
-			   	4. get offline inform
+			   	//4. get offline inform
+			   	//5. get user list 
 			*/
 			switch msg {
 			//	case 1: // confirm ok
