@@ -258,6 +258,7 @@ func (ouser *OLUser) DoOffline() {
 		usr.Newjob <- "Refresh"
 	}
 	maplock.RUnlock()
+	ouser.NetConn.Close()
 	ouser.CtrlOut <- 1
 }
 
@@ -297,6 +298,7 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 		select {
 		case <-oluser.CtrlIn:
 			// do offline
+fmt.Println(uinfo.Username,"CtrlIn timeout")
 			oluser.DoOffline()
 			return
 		case msg := <-oluser.RdMsg:
@@ -306,6 +308,7 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 			   	//4. get offline inform
 			   	//5. get user list 
 			*/
+fmt.Println(uinfo.Username,"RdMsg:",msg)
 			switch msg {
 			//	case 1: // confirm ok
 			//	case 2: // heartbeat
@@ -316,6 +319,7 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 				return
 			}
 		case <-time.After(time.Second * 90):
+fmt.Println(uinfo.Username,"Offline timeout")
 			oluser.DoOffline()
 			return
 			// no message in 120 seconds, timeout

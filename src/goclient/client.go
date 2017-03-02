@@ -259,8 +259,9 @@ func OnlineRead(brd *bufio.Reader, chw, chmsg chan string){
 					}
 				}
 			}
-		}else{ // unknown message type
-			break
+		}else{ //connection break
+			println("read error!")
+			return
 		}
 	}
 }
