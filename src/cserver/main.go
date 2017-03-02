@@ -248,6 +248,7 @@ func (ouser *OLUser) WriteProc() {
 
 func (ouser *OLUser) DoOffline() {
 	maplock.Lock()
+//	ouser.NetConn.Close()
 	delete(online_user, ouser.Username) //should be done in connection routine
 	maplock.Unlock()
 	ouser.Newjob <- "Offline\n" // quit write proc, \n to be splitted
@@ -258,7 +259,6 @@ func (ouser *OLUser) DoOffline() {
 		usr.Newjob <- "Refresh"
 	}
 	maplock.RUnlock()
-	ouser.NetConn.Close()
 	ouser.CtrlOut <- 1
 }
 
