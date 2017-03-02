@@ -108,10 +108,10 @@ func (ouser *OLUser) ReadProc() {
 				}
 				ouser.Sendlock.Unlock()
 			}
-					ouser.RdMsg <- 1
+			ouser.RdMsg <- 1
 		case "Heartbeat":
 			ouser.Newjob <- "Heartbeat"
-					ouser.RdMsg <- 2
+			ouser.RdMsg <- 2
 
 		case "GetUserInfo":
 			ouser.Newjob <- "UsrUpdate"
@@ -160,7 +160,8 @@ func (ouser *OLUser) ReadProc() {
 			}
 		case "Offline":
 			// imform all online users reload user info
-			ouser.DoOffline()
+	//		ouser.DoOffline()
+			ouser.RdMsg<-4
 			return
 		default:
 			log.Println("Unknown message type:", cmd)
@@ -225,6 +226,7 @@ func (ouser *OLUser) WriteProc() {
 			com := strings.Split(job, "\n")
 			switch com[0] {
 			case "Offline":
+	//			log.Println("user:",ouser.Username,"now offline")
 				return
 			case "Heartbeat":
 				ouser.NetConn.Write([]byte("Heartbeat\n"))
@@ -330,7 +332,10 @@ func procConn(conn net.Conn) {
 	//	pClose:=new(bool)
 	//	*pClose=true
 	//	defer doClose(conn,pClose)
-	defer conn.Close()
+	defer func(){
+//		log.Println("Now close conn")
+		 conn.Close()
+	}()
 	rd := bufio.NewReader(conn)
 	command, _, err := rd.ReadLine()
 	if err != nil {
