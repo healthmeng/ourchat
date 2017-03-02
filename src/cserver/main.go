@@ -298,7 +298,6 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 		select {
 		case <-oluser.CtrlIn:
 			// do offline
-fmt.Println(uinfo.Username,"CtrlIn timeout")
 			oluser.DoOffline()
 			return
 		case msg := <-oluser.RdMsg:
@@ -308,7 +307,6 @@ fmt.Println(uinfo.Username,"CtrlIn timeout")
 			   	//4. get offline inform
 			   	//5. get user list 
 			*/
-fmt.Println(uinfo.Username,"RdMsg:",msg)
 			switch msg {
 			//	case 1: // confirm ok
 			//	case 2: // heartbeat
@@ -318,8 +316,7 @@ fmt.Println(uinfo.Username,"RdMsg:",msg)
 				oluser.DoOffline()
 				return
 			}
-		case <-time.After(time.Second * 90):
-fmt.Println(uinfo.Username,"Offline timeout")
+		case <-time.After(time.Second * 100):
 			oluser.DoOffline()
 			return
 			// no message in 120 seconds, timeout

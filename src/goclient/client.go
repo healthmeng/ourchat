@@ -197,7 +197,7 @@ func ProcInput(chw chan string){
 }
 
 func OnlineWrite(conn net.Conn, chw chan string){
-	tm:=time.NewTimer(time.Minute)
+	tm:=time.NewTimer(time.Second*30)
 	for{
 		select{
 		case wr:=<-chw:
@@ -210,7 +210,7 @@ func OnlineWrite(conn net.Conn, chw chan string){
 			if _,err:=conn.Write([]byte("Heartbeat\n"));err!=nil{
 				return
 			}
-			tm.Reset(time.Minute)
+			tm.Reset(time.Second*30)
 		}
 	}
 
