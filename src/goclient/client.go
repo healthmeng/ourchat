@@ -176,7 +176,7 @@ func doLogin(){
 					return
 				}
 				if retmsg!="Heartbeat"{
-					fmt.Println("receive:",time.Now(),":",retmsg)
+			//		fmt.Println("receive:",time.Now(),":",retmsg)
 				}
 		}
 	}
