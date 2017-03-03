@@ -176,7 +176,7 @@ func doLogin(){
 					return
 				}
 				if retmsg!="Heartbeat"{
-			//		fmt.Println("receive:",time.Now(),":",retmsg)
+					fmt.Println("receive:",retmsg)
 				}
 		}
 	}
@@ -225,9 +225,10 @@ func OnlineRead(brd *bufio.Reader, chw, chmsg chan string){
 					return
 				}
 				var mid,mtype,mlen,from int
-				var  tmstamp string;
-				fmt.Sscanf(string(info),"%d%d%d%d%s",&mid,&mtype,&mlen,&from,&tmstamp)
+				var  tmstamp,dt,tm string;
+				fmt.Sscanf(string(info),"%d%d%d%d%s%s",&mid,&mtype,&mlen,&from,&dt,&tm)
 				/////
+				tmstamp=dt+" "+tm
 				detail,_,err:=brd.ReadLine()
 				if err!=nil{
 					return
