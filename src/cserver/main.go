@@ -6,6 +6,7 @@ import (
 	"dbop"
 	"fmt"
 	"log"
+	"errors"
 	"net"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ type OLUser struct {
 	SendQ    *list.List // type MessageID，load from db
 	MsgSet   map[int64]dbop.MsgInfo
 	Sendlock *sync.RWMutex
+	LastMsgID	int64
 	NetConn  net.Conn
 }
 
@@ -52,13 +54,19 @@ func (ouser *OLUser) ParseMsg(buf []byte, rd *bufio.Reader) (*dbop.MsgInfo, erro
 	// 	ToUID Type Length\n
 	//	Content
 	head := string(buf)
-	var filelen int
 	var msg dbop.MsgInfo
+	var filelen int
+	var curmsgid int64
+	fmt.Sscanf(head, "%d%d%d%d", &curmsgid,&msg.ToUID, &msg.Type, &filelen)
+	if curmsgid<= ouser.LastMsgID{
+		return nil,errors.New("Message out of date")
+	}
+	log.Println("LastMsgID,curmsgid",ouser.LastMsgID,curmsgid)
+	ouser.LastMsgID=curmsgid
 	msg.FromUID = ouser.UID
 	msg.Arrived = 0
 	tm := time.Now().Local()
 	msg.SvrStamp = fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d", tm.Year(), tm.Month(), tm.Day(), tm.Hour(), tm.Minute(), tm.Second())
-	fmt.Sscanf(head, "%d%d%d", &msg.ToUID, &msg.Type, &filelen)
 	switch msg.Type {
 	case 1: // txt
 		content, _, err := rd.ReadLine()
@@ -135,7 +143,8 @@ func (ouser *OLUser) ReadProc() {
 			msginfo, err := ouser.ParseMsg(buf, rd) // *MsgInfo
 
 			if err != nil {
-				log.Println("Error client message format")
+			// may repeat messages
+		//		log.Println("Error client message format")
 				//		rd.Reset(ouser.NetConn) can't reset, or may lose heatbeat
 				break
 			} else {
@@ -274,7 +283,7 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 	oluser := &OLUser{uinfo, make(chan int, 1), make(chan int, 1),
 		make(chan int, 10), make(chan string, 10),
 		list.New(), make(map[int64]dbop.MsgInfo),
-		new(sync.RWMutex), conn}
+		new(sync.RWMutex), -1,conn}
 	oluser.SendQ.Init()
 	/*
 		1. Create ouser obj in map

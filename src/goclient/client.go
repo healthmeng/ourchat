@@ -20,6 +20,7 @@ var svraddr string = "127.0.0.1"
 //var svraddr string = "123.206.55.31"
 var svrport string = ":2048"
 var connstr string=""
+var gmsgid int64=0
 
 type UserInfo struct{
 	UID int64
@@ -191,7 +192,8 @@ func ProcInput(chw chan string){
 		fmt.Println("Message:")
 		fmt.Scanf("%s",&msg)
 		msg,_=convgbk.UTF2GB(msg)
-		output:=fmt.Sprintf("SendMsg\n%d %d %d\n%s\n",uid,1,len(msg),msg)
+		output:=fmt.Sprintf("SendMsg\n%d %d %d %d\n%s\n",gmsgid,uid,1,len(msg),msg)
+		gmsgid++
 		chw<-output
 	}
 }
