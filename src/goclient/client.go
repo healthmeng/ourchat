@@ -14,6 +14,7 @@ import (
 "runtime"
 "strings"
 "convgbk"
+"dbop"
 )
 
 var svraddr string = "127.0.0.1"
@@ -184,15 +185,21 @@ func doLogin(){
 }
 
 func ProcInput(chw chan string){
-	var  uid int
+	var user string
 	var msg string
 	for{
-		fmt.Println("Send to(UID):")
-		fmt.Scanf("%d",&uid)
+		user=""
+		fmt.Println("Send to(username):")
+		fmt.Scanf("%s",&user)
+		info,_:=dbop.FindUser(user)
+		if info==nil{
+			fmt.Println("Wrong user")
+			continue
+		}
 		fmt.Println("Message:")
 		fmt.Scanf("%s",&msg)
 		msg,_=convgbk.UTF2GB(msg)
-		output:=fmt.Sprintf("SendMsg\n%d %d %d %d\n%s\n",gmsgid,uid,1,len(msg),msg)
+		output:=fmt.Sprintf("SendMsg\n%d %d %d %d\n%s\n",gmsgid,info.UID,1,len(msg),msg)
 		gmsgid++
 		chw<-output
 	}

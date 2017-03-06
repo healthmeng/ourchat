@@ -61,7 +61,6 @@ func (ouser *OLUser) ParseMsg(buf []byte, rd *bufio.Reader) (*dbop.MsgInfo, erro
 	if curmsgid<= ouser.LastMsgID{
 		return nil,errors.New("Message out of date")
 	}
-	log.Println("LastMsgID,curmsgid",ouser.LastMsgID,curmsgid)
 	ouser.LastMsgID=curmsgid
 	msg.FromUID = ouser.UID
 	msg.Arrived = 0
@@ -397,15 +396,6 @@ func procConn(conn net.Conn) {
 			return
 		}
 
-		maplock.RLock()
-		online, ok := online_user[user]
-		maplock.RUnlock()
-		if ok {
-			online.CtrlIn <- 1 // start offline
-			<-online.CtrlOut   // finished
-			//	delete(online_user,user.Username) //should be done in connection routine
-		}
-
 		uinfo, _ := dbop.FindUser(user)
 		if uinfo == nil {
 			conn.Write([]byte("ERROR: No such user\n"))
@@ -415,7 +405,18 @@ func procConn(conn net.Conn) {
 			conn.Write([]byte("ERROR: Bad user/passwd\n"))
 			return
 		}
+
 		conn.Write([]byte(fmt.Sprintf("OK\n%d\n", uinfo.UID)))
+		maplock.RLock()
+		online, ok := online_user[user]
+		maplock.RUnlock()
+		if ok {
+			online.CtrlIn <- 1 // start offline
+			<-online.CtrlOut   // finished
+			//	delete(online_user,user.Username) //should be done in connection routine
+		}
+
+
 		//	*pClose=false
 		DoOnline(uinfo, conn)
 
