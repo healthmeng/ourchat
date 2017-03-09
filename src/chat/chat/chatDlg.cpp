@@ -13,6 +13,8 @@
 #define new DEBUG_NEW
 #endif
 
+#define BMP_FACE0 9000
+#define BMP_FACEBW0	9100
 
 // CchatDlg ¶Ô»°¿ò
 
@@ -145,19 +147,17 @@ BOOL CchatDlg::OnInitDialog()
 	//m_imgList.Add(theApp.LoadIcon(IDR_MAINFRAME));
 	//m_imgList.Add(theApp.LoadIcon(IDI_ICON1));
 	for(int i=0;i<6;i++){
-		char szName[256];
-		sprintf(szName,"d:\\a\\img\\face%dbw.bmp",i);
-		HBITMAP hbmp=(HBITMAP)LoadImage(NULL,szName,IMAGE_BITMAP,32,32,
-			LR_CREATEDIBSECTION | LR_LOADFROMFILE);
+		HBITMAP hbmp=(HBITMAP)LoadImage(AfxGetInstanceHandle(),
+			MAKEINTRESOURCE(IDB_FACEBW0+i) ,IMAGE_BITMAP,32,32,
+			LR_CREATEDIBSECTION);//| LR_LOADFROMFILE);
 		CBitmap bmp;
 		bmp.Attach(hbmp);
 		m_imgList.Add(&bmp,RGB(255,255,255));
 	}
 	for(int i=0;i<6;i++){
-		char szName[256];
-		sprintf(szName,"d:\\a\\img\\face%d.bmp",i);
-		HBITMAP hbmp=(HBITMAP)LoadImage(NULL,szName,IMAGE_BITMAP,32,32,
-			LR_CREATEDIBSECTION | LR_LOADFROMFILE);
+		HBITMAP hbmp=(HBITMAP)LoadImage(AfxGetInstanceHandle(),
+			MAKEINTRESOURCE(IDB_FACE0+i) ,IMAGE_BITMAP,32,32,
+			LR_CREATEDIBSECTION);//| LR_LOADFROMFILE);
 		CBitmap bmp;
 		bmp.Attach(hbmp);
 		m_imgList.Add(&bmp,RGB(255,255,255));

@@ -44,15 +44,15 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Program Files %28x86%29\OpenSSL\include;$(IncludePath)</IncludePath>
-    <ReferencePath>C:\Program Files %28x86%29\OpenSSL\lib;$(ReferencePath)</ReferencePath>
-    <LibraryPath>C:\Program Files %28x86%29\OpenSSL\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(IncludePath)</IncludePath>
+    <ReferencePath>$(ReferencePath)</ReferencePath>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>C:\Program Files %28x86%29\OpenSSL\include;$(IncludePath)</IncludePath>
-    <ReferencePath>C:\Program Files %28x86%29\OpenSSL\lib;$(ReferencePath)</ReferencePath>
-    <LibraryPath>C:\Program Files %28x86%29\OpenSSL\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(IncludePath)</IncludePath>
+    <ReferencePath>$(ReferencePath)</ReferencePath>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -133,6 +133,18 @@
     <None Include="res\chat.rc2" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="D:\a\img\face0.bmp" />
+    <Image Include="D:\a\img\face0bw.bmp" />
+    <Image Include="D:\a\img\face2.bmp" />
+    <Image Include="D:\a\img\face2bw.bmp" />
+    <Image Include="D:\a\img\face4.bmp" />
+    <Image Include="D:\a\img\face4bw.bmp" />
+    <Image Include="D:\a\img\face5.bmp" />
+    <Image Include="D:\a\img\face5bw.bmp" />
+    <Image Include="D:\a\img\timg (2).bmp" />
+    <Image Include="D:\a\img\timg (4).bmp" />
+    <Image Include="D:\a\img\timg(2)bw.bmp" />
+    <Image Include="D:\a\img\timg(4)bw.bmp" />
     <Image Include="res\chat.ico" />
     <Image Include="res\icon1.ico" />
     <Image Include="res\icon2.ico" />

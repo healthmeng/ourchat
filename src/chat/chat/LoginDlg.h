@@ -3,6 +3,7 @@
 
 // CLoginDlg ¶Ô»°¿ò
 
+
 class CLoginDlg : public CDialogEx
 {
 	DECLARE_DYNAMIC(CLoginDlg)
