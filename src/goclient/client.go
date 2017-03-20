@@ -2,6 +2,7 @@ package main
 
 import (
 "net"
+"io"
 "fmt"
 "bufio"
 "time"
@@ -176,9 +177,10 @@ func doLogin(){
 				if retmsg=="Closed"{
 					fmt.Println("Remote connection closed.")
 					return
-				}
-				if retmsg!="Heartbeat"{
-					fmt.Println("receive:",retmsg)
+				}else if strings.HasPrefix(retmsg,"Text:"){
+					fmt.Println("receive:",strings.TrimPrefix(retmsg,"Text:"))
+				}else if strings.HasPrefix(retmsg,"Users\n"){
+					fmt.Println(retmsg)
 				}
 		}
 	}
@@ -187,10 +189,15 @@ func doLogin(){
 func ProcInput(chw chan string){
 	var user string
 	var msg string
+	var output string
 	for{
 		user=""
 		fmt.Println("Send to(username):")
 		fmt.Scanf("%s",&user)
+		if user=="quit"{
+			chw<-"Offline\n"
+			return
+		}
 		info,_:=dbop.FindUser(user)
 		if info==nil{
 			fmt.Println("Wrong user")
@@ -198,11 +205,26 @@ func ProcInput(chw chan string){
 		}
 		fmt.Println("Message:")
 		fmt.Scanf("%s",&msg)
-		msg,_=convgbk.UTF2GB(msg)
-		output:=fmt.Sprintf("SendMsg\n%d %d %d %d\n%s\n",gmsgid,info.UID,1,len(msg),msg)
+		if strings.HasPrefix(msg,"img:"){
+			fname:=strings.TrimPrefix(msg,"img:")
+			finfo,err:=os.Stat(fname)
+			if err!=nil{
+				fmt.Println("File not found")
+				continue
+			}
+			output=fmt.Sprintf("Img:%d:%d:%d:%d:%s",gmsgid,info.UID,2,finfo.Size(),fname)
+		}else{
+			msg,_=convgbk.UTF2GB(msg)
+			output=fmt.Sprintf("SendMsg\n%d %d %d %d\n%s\n",gmsgid,info.UID,1,len(msg),msg)
+		}
 		gmsgid++
 		chw<-output
 	}
+}
+
+func showimg(fname string){
+	exec.Command("okular",fname).Run()
+	os.Remove(fname)
 }
 
 func OnlineWrite(conn net.Conn, chw chan string){
@@ -210,9 +232,22 @@ func OnlineWrite(conn net.Conn, chw chan string){
 	for{
 		select{
 		case wr:=<-chw:
-			if _,err:=conn.Write([]byte(wr));err!=nil{
-			fmt.Println("write error!")
-				return
+			if strings.HasPrefix(wr,"Img:"){
+				fields:=strings.Split(wr,":")
+				if len(fields)!=6 {
+						return
+				}
+				conn.Write([]byte(fmt.Sprintf("SendMsg\n%s %s %s %s\n",strings.TrimSuffix(fields[1],":"),strings.TrimSuffix(fields[2],":"),
+					strings.TrimSuffix(fields[3],":"),strings.TrimSuffix(fields[4],":"))))
+				fd,_:=os.Open(fields[5])
+				defer fd.Close()
+				fsize,_:=strconv.ParseInt(strings.TrimSuffix(fields[4],":"),10,64)
+				io.CopyN(conn,fd,fsize)
+			}else{
+				if _,err:=conn.Write([]byte(wr));err!=nil{
+					fmt.Println("write error!")
+					return
+				}
 			}
 		case <-tm.C:
 			if _,err:=conn.Write([]byte("Heartbeat\n"));err!=nil{
@@ -233,17 +268,28 @@ func OnlineRead(brd *bufio.Reader, chw, chmsg chan string){
 				if err!=nil{
 					return
 				}
-				var mid,mtype,mlen,from int
+				var mid,mtype,from int
+				var mlen int64
 				var  tmstamp,dt,tm string;
 				fmt.Sscanf(string(info),"%d%d%d%d%s%s",&mid,&mtype,&mlen,&from,&dt,&tm)
 				/////
 				tmstamp=dt+" "+tm
-				detail,_,err:=brd.ReadLine()
-				if err!=nil{
-					return
+				switch mtype{
+				case 1:
+					detail,_,err:=brd.ReadLine()
+					if err!=nil{
+						return
+					}
+					strdetail,_:=convgbk.GB2UTF(string(detail))
+					chmsg<-fmt.Sprintf("Text:%d %s :%s",from,tmstamp,strdetail)
+				case 2:
+					fname:=fmt.Sprintf("%s/img-%d",os.TempDir(),time.Now().UnixNano())
+					fd,_:=os.Create(fname)
+					io.CopyN(fd,brd,mlen)
+					fd.Close()
+					chmsg<-fmt.Sprintf("Text:%d %s :Image",from,tmstamp)
+					go showimg(fname)
 				}
-				strdetail,_:=convgbk.GB2UTF(string(detail))
-				chmsg<-fmt.Sprintf("%d %s :%s",from,tmstamp,strdetail)
 				chw<-fmt.Sprintf("Confirm\n%d\n",mid)
 			case "Heartbeat":
 				chmsg<-"Heartbeat"

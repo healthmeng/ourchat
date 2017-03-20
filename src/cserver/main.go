@@ -3,7 +3,9 @@
 import (
 	"bufio"
 	"container/list"
+	"io"
 	"dbop"
+	"os"
 	"fmt"
 	"log"
 	"errors"
@@ -55,7 +57,7 @@ func (ouser *OLUser) ParseMsg(buf []byte, rd *bufio.Reader) (*dbop.MsgInfo, erro
 	//	Content
 	head := string(buf)
 	var msg dbop.MsgInfo
-	var filelen int
+	var filelen int64
 	var curmsgid int64
 	fmt.Sscanf(head, "%d%d%d%d", &curmsgid,&msg.ToUID, &msg.Type, &filelen)
 	if curmsgid<= ouser.LastMsgID{
@@ -73,12 +75,38 @@ func (ouser *OLUser) ParseMsg(buf []byte, rd *bufio.Reader) (*dbop.MsgInfo, erro
 			log.Println("Get message content error")
 			return nil, err
 		}
-		if len(content) != filelen {
+		if int64(len(content)) != filelen {
 			log.Println("Warning: read bytes != msg length")
 		}
 		msg.Content = string(content)
+	case 2: // image
+		savepath,err:=DownloadTmp(ouser.UID,rd,filelen)
+		if err!=nil{
+			log.Println("Download file error:",err)
+			return nil,err
+		}
+		msg.Content=savepath
 	}
 	return &msg, nil
+}
+
+func DownloadTmp(uid int64, rd *bufio.Reader, fsize int64)(string,error){
+	for{
+		tmpfile:=fmt.Sprintf("%s/ourchat-%d/%d",os.TempDir(),uid,time.Now().UnixNano())
+		if _,err:=os.Stat(tmpfile);err==nil{
+			time.Sleep(time.Nanosecond*1000)
+			continue
+		}
+		fd,_:=os.Create(tmpfile)
+		ncp,err:=io.CopyN(fd,rd,fsize)
+		if err!=nil || ncp!=fsize{
+			fd.Close()
+			os.Remove(tmpfile)
+			return "",errors.New("Transfer error")
+		}
+		fd.Close()
+		return tmpfile,nil
+	}
 }
 
 func (ouser *OLUser) ReadProc() {
@@ -104,6 +132,12 @@ func (ouser *OLUser) ReadProc() {
 			}
 			err = ouser.ConfirmMsg(msgid)
 			if err == nil {
+		        msg, ok := ouser.MsgSet[msgid]
+				if !ok {
+					log.Println("Kidding me? Confirmed message id not found in msgset")
+				}else{
+					os.Remove(msg.Content)
+				}
 				ouser.Sendlock.Lock()
 				delete(ouser.MsgSet, msgid)
 				for it := ouser.SendQ.Front(); it != nil; it = it.Next() {
@@ -192,7 +226,16 @@ func (ouser *OLUser) DoSendMsg() {
 		switch msg.Type {
 		case 1: // SendMsg\n MsgID(WindowID) MsgType MsgLen time\n Content\n"
 			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %d %s\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID, msg.SvrStamp) + msg.Content+"\n"))
-			//	case 2:
+		case 2:
+			finfo,err:=os.Stat(msg.Content)
+			if err!=nil{
+				log.Println("Image tmp file not found")
+				continue
+			}
+			fd,_:=os.Open(msg.Content)
+			fsize:=finfo.Size()
+			ouser.NetConn.Write([]byte("SendMsg\n"+fmt.Sprintf("%d %d %d %d %s\n",msg.MsgID,msg.Type,fsize,msg.FromUID,msg.SvrStamp)))
+			io.CopyN(ouser.NetConn,fd,fsize)
 			//	case 3:
 		}
 	}
@@ -284,6 +327,7 @@ func DoOnline(uinfo *dbop.UserInfo, conn net.Conn) {
 		list.New(), make(map[int64]dbop.MsgInfo),
 		new(sync.RWMutex), -1,conn}
 	oluser.SendQ.Init()
+	os.Mkdir(fmt.Sprintf("%s/ourchat-%d",os.TempDir(),oluser.UID),0644)
 	/*
 		1. Create ouser obj in map
 		2. Monitor ctrl chan
