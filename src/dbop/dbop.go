@@ -34,6 +34,12 @@ type MsgInfo struct{ // one table for each user
 	SvrStamp string
 }
 
+const (
+	TypeTxt = iota+1
+	TypePic
+	TypeBin
+)
+
 func init(){
 	var err error
 	db,err=sql.Open("mysql","work:Work4All;@tcp(123.206.55.31:3306)/chat")
@@ -55,7 +61,7 @@ func (info* UserInfo)ConfirmMsg(msgid int64)error{
 func (info* UserInfo)RegisterMsg(msginfo *MsgInfo) error{
 	msgtb:=fmt.Sprintf("msg%d",msginfo.ToUID)
 	var query string
-	if msginfo.Type==1{ // text
+	if msginfo.Type==TypeTxt{
 		tmp,_:=convgbk.GB2UTF(msginfo.Content)
 		query=fmt.Sprintf("insert into %s (type,content,fromuid,arrived,svrstamp) values (%d,'%s',%d,%d,'%s')",msgtb,msginfo.Type,tmp,msginfo.FromUID,0,msginfo.SvrStamp)
 	}else {
@@ -88,7 +94,7 @@ func (info* UserInfo)GetUnsentMsg()([]MsgInfo,error){
 			log.Println("Parse db message error:",err)
 			return nil,err
 		}
-		if msg.Type==1{
+		if msg.Type==TypeTxt{
 			msg.Content,_=convgbk.UTF2GB(msg.Content)
 		}
 		msg.ToUID=info.UID

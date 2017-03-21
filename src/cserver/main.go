@@ -69,7 +69,7 @@ func (ouser *OLUser) ParseMsg(buf []byte, rd *bufio.Reader) (*dbop.MsgInfo, erro
 	tm := time.Now().Local()
 	msg.SvrStamp = fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d", tm.Year(), tm.Month(), tm.Day(), tm.Hour(), tm.Minute(), tm.Second())
 	switch msg.Type {
-	case 1: // txt
+	case dbop.TypeTxt: // txt
 		content, _, err := rd.ReadLine()
 		if err != nil {
 			log.Println("Get message content error")
@@ -79,8 +79,13 @@ func (ouser *OLUser) ParseMsg(buf []byte, rd *bufio.Reader) (*dbop.MsgInfo, erro
 			log.Println("Warning: read bytes != msg length")
 		}
 		msg.Content = string(content)
-	case 2: // image
-		savepath,err:=DownloadTmp(ouser.UID,rd,filelen)
+	case dbop.TypePic: // image
+		imgtype,_,err:=rd.ReadLine()
+		if err!=nil{
+			log.Println("Get image type error:",err)
+			return nil,err
+		}
+		savepath,err:=DownloadTmp(ouser.UID,rd,filelen,string(imgtype))
 		if err!=nil{
 			log.Println("Download file error:",err)
 			return nil,err
@@ -90,9 +95,9 @@ func (ouser *OLUser) ParseMsg(buf []byte, rd *bufio.Reader) (*dbop.MsgInfo, erro
 	return &msg, nil
 }
 
-func DownloadTmp(uid int64, rd *bufio.Reader, fsize int64)(string,error){
+func DownloadTmp(uid int64, rd *bufio.Reader, fsize int64, imgtype string)(string,error){
 	for{
-		tmpfile:=fmt.Sprintf("%s/ourchat-%d/%d",os.TempDir(),uid,time.Now().UnixNano())
+		tmpfile:=fmt.Sprintf("%s/ourchat-%d/%d.%s",os.TempDir(),uid,time.Now().UnixNano(),imgtype)
 		if _,err:=os.Stat(tmpfile);err==nil{
 			time.Sleep(time.Nanosecond*1000)
 			continue
@@ -224,17 +229,25 @@ func (ouser *OLUser) DoSendMsg() {
 			continue
 		}
 		switch msg.Type {
-		case 1: // SendMsg\n MsgID(WindowID) MsgType MsgLen time\n Content\n"
+		case dbop.TypeTxt: // SendMsg\n MsgID(WindowID) MsgType MsgLen time\n Content\n"
 			ouser.NetConn.Write([]byte("SendMsg\n" + fmt.Sprintf("%d %d %d %d %s\n", msg.MsgID, msg.Type, len(msg.Content)+1, msg.FromUID, msg.SvrStamp) + msg.Content+"\n"))
-		case 2:
+		case dbop.TypePic:
 			finfo,err:=os.Stat(msg.Content)
 			if err!=nil{
 				log.Println("Image tmp file not found")
 				continue
 			}
+			names:=strings.Split(msg.Content,".")
+			num:=len(names)
+			var imgtype string
+			if num>1{
+				imgtype=names[num-1]
+			}else{
+				imgtype="cimg"
+			}
 			fd,_:=os.Open(msg.Content)
 			fsize:=finfo.Size()
-			ouser.NetConn.Write([]byte("SendMsg\n"+fmt.Sprintf("%d %d %d %d %s\n",msg.MsgID,msg.Type,fsize,msg.FromUID,msg.SvrStamp)))
+			ouser.NetConn.Write([]byte("SendMsg\n"+fmt.Sprintf("%d %d %d %d %s\n%s\n",msg.MsgID,msg.Type,fsize,msg.FromUID,msg.SvrStamp,imgtype)))
 			io.CopyN(ouser.NetConn,fd,fsize)
 			//	case 3:
 		}

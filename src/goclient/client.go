@@ -7,11 +7,9 @@ import (
 "bufio"
 "time"
 "crypto/sha256"
-//"encoding/json"
 "os/exec"
 "os"
 "strconv"
-// "compress/gzip"
 "runtime"
 "strings"
 "convgbk"
@@ -237,9 +235,18 @@ func OnlineWrite(conn net.Conn, chw chan string){
 				if len(fields)!=6 {
 						return
 				}
-				conn.Write([]byte(fmt.Sprintf("SendMsg\n%s %s %s %s\n",strings.TrimSuffix(fields[1],":"),strings.TrimSuffix(fields[2],":"),
-					strings.TrimSuffix(fields[3],":"),strings.TrimSuffix(fields[4],":"))))
-				fd,_:=os.Open(fields[5])
+				fname:=fields[5]
+				names:=strings.Split(fname,".")
+				num:=len(names)
+				var imgtype string
+				if num>1{
+					imgtype=names[num-1]
+				}else{
+					imgtype="cimg"
+				}
+				conn.Write([]byte(fmt.Sprintf("SendMsg\n%s %s %s %s\n%s\n",strings.TrimSuffix(fields[1],":"),strings.TrimSuffix(fields[2],":"),
+					strings.TrimSuffix(fields[3],":"),strings.TrimSuffix(fields[4],":"),imgtype)))
+				fd,_:=os.Open(fname)
 				defer fd.Close()
 				fsize,_:=strconv.ParseInt(strings.TrimSuffix(fields[4],":"),10,64)
 				io.CopyN(conn,fd,fsize)
@@ -275,15 +282,20 @@ func OnlineRead(brd *bufio.Reader, chw, chmsg chan string){
 				/////
 				tmstamp=dt+" "+tm
 				switch mtype{
-				case 1:
+				case dbop.TypeTxt:
 					detail,_,err:=brd.ReadLine()
 					if err!=nil{
 						return
 					}
 					strdetail,_:=convgbk.GB2UTF(string(detail))
 					chmsg<-fmt.Sprintf("Text:%d %s :%s",from,tmstamp,strdetail)
-				case 2:
-					fname:=fmt.Sprintf("%s/img-%d",os.TempDir(),time.Now().UnixNano())
+				case dbop.TypePic:
+					imgtype,_,err:=brd.ReadLine()
+					if err!=nil{
+						println("Get image type error")
+						return
+					}
+					fname:=fmt.Sprintf("%s/img-%d.%s",os.TempDir(),time.Now().UnixNano(),string(imgtype))
 					fd,_:=os.Create(fname)
 					io.CopyN(fd,brd,mlen)
 					fd.Close()
