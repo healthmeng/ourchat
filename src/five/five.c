@@ -264,7 +264,7 @@ BWCORE evaluate(){
 
 
 // half /
-	for(i=4;i<=15;++i){
+	for(i=4;i<15;++i){
 		int incal=0,last=0; // 0,1,2
 		int lsp=0,rsp=0,msp=0;
 		int cnt=0;
@@ -435,7 +435,7 @@ BWCORE evaluate(){
 
 // half \
 
-	for(i=4;i<=15;++i){
+	for(i=4;i<15;++i){
 		int incal=0,last=0; // 0,1,2
 		int lsp=0,rsp=0,msp=0;
 		int cnt=0;
@@ -679,7 +679,6 @@ if(x==6 && y==9)
 	}
 	if (n>=4)
 		return frame[x][y];
-printf("n=%d\n",n);
 	
 	return 0;
 }
@@ -703,8 +702,11 @@ struct STEP algol1(){
 	int samecnt=0;
 	for(i=0;i<npos;i++){
 		BWCORE sc;
+		sc.bscore=sc.wscore=0;
 		int score;
 		applystep(steps[i]);
+if(steps[i].x==6 && steps[i].y==5)
+	printf("enter watch\n");
 		sc=evaluate();
 printf("%d,%d: b: %d, w %d\n",steps[i].x,steps[i].y,sc.bscore,sc.wscore);
 		score=sc.wscore-sc.bscore;
@@ -763,7 +765,7 @@ redo:
 			goto redo;
 		frame[x][y]=you;
 		curstep++;
-		drawtxt();
+//		drawtxt();
 		if(checkover(x,y)){
 			printf("You win!\n");
 			break;
@@ -771,7 +773,7 @@ redo:
 
 		st=algol1();
 		curstep++;
-		drawtxt();
+//		drawtxt();
 		if(checkover(st.x,st.y)){
 			printf("computer win!\n");
 			break;
