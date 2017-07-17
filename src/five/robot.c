@@ -2,25 +2,16 @@
 #include <assert.h>
 #include <time.h>
 #include <stdlib.h>
+#include "robot.h"
 
 #define SCORE_INIT -20000
 
 
-int frame[15][15];
-
-int max_score;
-int curstep=0;
-#define MAX_STEP 15*15
-
-struct STEP{
-	int x,y;
-	int bw;
-//	int n;
-};
-
-
-struct STEP max_route[100];
-struct STEP current_path[100];
+static int frame[15][15];
+static curstep=0;
+static int max_score;
+static ailevel=0;
+static struct STEP steplog[MAX_STEP];
 
 typedef struct _BWSCORE{
 	int bscore;
@@ -29,7 +20,7 @@ typedef struct _BWSCORE{
 
 int computerbw=2;	// computer use white
 
-void addcond(BWCORE *ps, int bw,int cnt,int left,int right, int midspace){
+void addcond(BWCORE *ps, int bw,int cnt,int left,int right, int midspace, int nturn){
 	int score=0;
 	if(midspace==cnt)
 		midspace=0;
@@ -51,14 +42,14 @@ void addcond(BWCORE *ps, int bw,int cnt,int left,int right, int midspace){
 		}else{
 				score=720;
 		}
-		if(score && bw==1)
+		if(score && bw==nturn)
 			score=10000;
 	}
 	if (cnt==3){
 		if(left && right && left+right>2)
 		{
 			score=720;
-			if (bw==1) score=2000;
+			if (bw==nturn) score=2000;
 		}
 		else{
 		 if(left+right>=2)
@@ -73,7 +64,7 @@ void addcond(BWCORE *ps, int bw,int cnt,int left,int right, int midspace){
 			score=120;
 		else if(left +right>=3)
 			score=20;
-		if( score && bw==1) score+=10;
+		if( score && bw==nturn) score+=10;
 	}
 
 	if(cnt==1){
@@ -87,7 +78,7 @@ void addcond(BWCORE *ps, int bw,int cnt,int left,int right, int midspace){
 //    printf("addcount: bw %d, cnt %d\n",bw,cnt, score);
 }
 
-BWCORE evaluate(){
+BWCORE evaluate(int nextturn){
 	BWCORE s={
 		.bscore=0,
 		.wscore=0
@@ -107,7 +98,7 @@ BWCORE evaluate(){
 					incal=cur;// --*
 					cnt=1;
 					if(j==14)
-						addcond(&s,incal,cnt,lsp,0,0);
+						addcond(&s,incal,cnt,lsp,0,0,nextturn);
 				}
 			}else{ // incal!=0
 				if(cur==0){ // -
@@ -118,12 +109,12 @@ BWCORE evaluate(){
 							msp=0;
 						for(k=j;k<15 && !frame[i][j];++k)
 							rsp++;
-						addcond(&s,incal,cnt,lsp,rsp,msp);
+						addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						cnt=rsp=incal=0;
 						lsp=2;
 					}else{ // last!=0 ***-
 						if(j==14){
-							addcond(&s,incal,cnt,lsp,1,msp);
+							addcond(&s,incal,cnt,lsp,1,msp,nextturn);
 							continue;
 						}
 						if(msp==0){ 
@@ -131,11 +122,11 @@ BWCORE evaluate(){
 							rsp=1;
 						}else{ // msp!=0 && last!=0: *-**-
 							if(frame[i][j+1]==0){ // *-**--
-								addcond(&s,incal,cnt,lsp,2,msp);
+								addcond(&s,incal,cnt,lsp,2,msp,nextturn);
 								cnt=incal=rsp=0;
 								lsp=1;
 							}else{ // *-**-?
-								addcond(&s,incal,cnt,lsp,1,msp);
+								addcond(&s,incal,cnt,lsp,1,msp,nextturn);
 								if(frame[i][j+1]==incal){ // *-**-*
 									cnt=cnt-msp;
 									lsp=1;
@@ -155,16 +146,16 @@ BWCORE evaluate(){
 				}else{	// incal!=0, cur!=0 : *x || * x ||  ** ||  *-*
 					if(j==14){
 						if(cur!=incal)
-							addcond(&s,incal,cnt,lsp,rsp,msp);
+							addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						else
-							addcond(&s,incal,cnt+1,lsp,0,msp);
+							addcond(&s,incal,cnt+1,lsp,0,msp,nextturn);
 						continue;
 					}
 					if(incal==cur){
 						cnt++;
 						rsp=0;
 					}else{
-						addcond(&s,incal,cnt,lsp,rsp,msp);
+						addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						incal=cur;
 						lsp=rsp;
 						rsp=0;
@@ -192,7 +183,7 @@ BWCORE evaluate(){
 					incal=cur;// --*
 					cnt=1;
 					if(j==14)
-						addcond(&s,incal,cnt,lsp,0,0);
+						addcond(&s,incal,cnt,lsp,0,0,nextturn);
 				}
 			}else{ // incal!=0
 				if(cur==0){ // -
@@ -203,12 +194,12 @@ BWCORE evaluate(){
 							msp=0;
 						for(k=j;k<15 && !frame[i][j];++k)
 							rsp++;
-						addcond(&s,incal,cnt,lsp,rsp,msp);
+						addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						cnt=rsp=incal=0;
 						lsp=2;
 					}else{ // last!=0 ***-
 						if(j==14){
-							addcond(&s,incal,cnt,lsp,1,msp);
+							addcond(&s,incal,cnt,lsp,1,msp,nextturn);
 							continue;
 						}
 						if(msp==0){ 
@@ -216,11 +207,11 @@ BWCORE evaluate(){
 							rsp=1;
 						}else{ // msp!=0 && last!=0: *-**-
 							if(frame[j+1][i]==0){ // *-**--
-								addcond(&s,incal,cnt,lsp,2,msp);
+								addcond(&s,incal,cnt,lsp,2,msp,nextturn);
 								cnt=incal=rsp=0;
 								lsp=1;
 							}else{ // *-**-?
-								addcond(&s,incal,cnt,lsp,1,msp);
+								addcond(&s,incal,cnt,lsp,1,msp,nextturn);
 								if(frame[j+1][i]==incal){ // *-**-*
 									cnt=cnt-msp;
 									lsp=1;
@@ -239,16 +230,16 @@ BWCORE evaluate(){
 				}else{	// incal!=0, cur!=0 : *x || * x ||  ** ||  *-*
 					if(j==14){
 						if(cur!=incal)
-							addcond(&s,incal,cnt,lsp,rsp,msp);
+							addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						else
-							addcond(&s,incal,cnt+1,lsp,0,msp);
+							addcond(&s,incal,cnt+1,lsp,0,msp,nextturn);
 						continue;
 					}
 					if(incal==cur){
 						cnt++;
 						rsp=0;
 					}else{
-						addcond(&s,incal,cnt,lsp,rsp,msp);
+						addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						incal=cur;
 						lsp=rsp;
 						rsp=0;
@@ -277,7 +268,7 @@ BWCORE evaluate(){
 					incal=cur;// --*
 					cnt=1;
 					if(j==i)
-						addcond(&s,incal,cnt,lsp,0,0);
+						addcond(&s,incal,cnt,lsp,0,0,nextturn);
 				}
 			}else{ // incal!=0
 				if(cur==0){ // -
@@ -288,12 +279,12 @@ BWCORE evaluate(){
 							msp=0;
 						for(k=j;k<=i && !frame[k][i-k];++k)
 							rsp++;
-						addcond(&s,incal,cnt,lsp,rsp,msp);
+						addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						cnt=rsp=incal=0;
 						lsp=2;
 					}else{ // last!=0 ***-
 						if(j==i){
-							addcond(&s,incal,cnt,lsp,1,msp);
+							addcond(&s,incal,cnt,lsp,1,msp,nextturn);
 							continue;
 						}
 						if(msp==0){ 
@@ -301,11 +292,11 @@ BWCORE evaluate(){
 							rsp=1;
 						}else{ // msp!=0 && last!=0: *-**-
 							if(frame[j+1][i-j-1]==0){ // *-**--
-								addcond(&s,incal,cnt,lsp,2,msp);
+								addcond(&s,incal,cnt,lsp,2,msp,nextturn);
 								cnt=incal=rsp=0;
 								lsp=1;
 							}else{ // *-**-?
-								addcond(&s,incal,cnt,lsp,1,msp);
+								addcond(&s,incal,cnt,lsp,1,msp,nextturn);
 								if(frame[j+1][i-j-1]==incal){ // *-**-*
 									cnt=cnt-msp;
 									lsp=1;
@@ -324,16 +315,16 @@ BWCORE evaluate(){
 				}else{	// incal!=0, cur!=0 : *x || * x ||  ** ||  *-*
 					if(j==i){
 						if(cur!=incal)
-							addcond(&s,incal,cnt,lsp,rsp,msp);
+							addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						else
-							addcond(&s,incal,cnt+1,lsp,0,msp);
+							addcond(&s,incal,cnt+1,lsp,0,msp,nextturn);
 						continue;
 					}
 					if(incal==cur){
 						cnt++;
 						rsp=0;
 					}else{
-						addcond(&s,incal,cnt,lsp,rsp,msp);
+						addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						incal=cur;
 						lsp=rsp;
 						rsp=0;
@@ -360,7 +351,7 @@ BWCORE evaluate(){
 					incal=cur;// --*
 					cnt=1;
 					if(j==i)
-						addcond(&s,incal,cnt,lsp,0,0);
+						addcond(&s,incal,cnt,lsp,0,0,nextturn);
 				}
 			}else{ // incal!=0
 				if(cur==0){ // -
@@ -371,12 +362,12 @@ BWCORE evaluate(){
 							msp=0;
 						for(k=j;k<=i && !frame[14-i+k][14-k];++k)
 							rsp++;
-						addcond(&s,incal,cnt,lsp,rsp,msp);
+						addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						cnt=rsp=incal=0;
 						lsp=2;
 					}else{ // last!=0 ***-
 						if(j==i){
-							addcond(&s,incal,cnt,lsp,1,msp);
+							addcond(&s,incal,cnt,lsp,1,msp,nextturn);
 							continue;
 						}
 						if(msp==0){ 
@@ -384,11 +375,11 @@ BWCORE evaluate(){
 							rsp=1;
 						}else{ // msp!=0 && last!=0: *-**-
 							if(frame[14-i+j+1][14-j-1]==0){ // *-**--
-								addcond(&s,incal,cnt,lsp,2,msp);
+								addcond(&s,incal,cnt,lsp,2,msp,nextturn);
 								cnt=incal=rsp=0;
 								lsp=1;
 							}else{ // *-**-?
-								addcond(&s,incal,cnt,lsp,1,msp);
+								addcond(&s,incal,cnt,lsp,1,msp,nextturn);
 								if(frame[14-i+j+1][14-j-1]==incal){ // *-**-*
 									cnt=cnt-msp;
 									lsp=1;
@@ -407,16 +398,16 @@ BWCORE evaluate(){
 				}else{	// incal!=0, cur!=0 : *x || * x ||  ** ||  *-*
 					if(j==i){
 						if(cur!=incal)
-							addcond(&s,incal,cnt,lsp,rsp,msp);
+							addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						else
-							addcond(&s,incal,cnt+1,lsp,0,msp);
+							addcond(&s,incal,cnt+1,lsp,0,msp,nextturn);
 						continue;
 					}
 					if(incal==cur){
 						cnt++;
 						rsp=0;
 					}else{
-						addcond(&s,incal,cnt,lsp,rsp,msp);
+						addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						incal=cur;
 						lsp=rsp;
 						rsp=0;
@@ -448,7 +439,7 @@ BWCORE evaluate(){
 					incal=cur;// --*
 					cnt=1;
 					if(j==i)
-						addcond(&s,incal,cnt,lsp,0,0);
+						addcond(&s,incal,cnt,lsp,0,0,nextturn);
 				}
 			}else{ // incal!=0
 				if(cur==0){ // -
@@ -459,12 +450,12 @@ BWCORE evaluate(){
 							msp=0;
 						for(k=j;k<=i && !frame[k][14-i+k];++k)
 							rsp++;
-						addcond(&s,incal,cnt,lsp,rsp,msp);
+						addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						cnt=rsp=incal=0;
 						lsp=2;
 					}else{ // last!=0 ***-
 						if(j==i){
-							addcond(&s,incal,cnt,lsp,1,msp);
+							addcond(&s,incal,cnt,lsp,1,msp,nextturn);
 							continue;
 						}
 						if(msp==0){ 
@@ -472,11 +463,11 @@ BWCORE evaluate(){
 							rsp=1;
 						}else{ // msp!=0 && last!=0: *-**-
 							if(frame[j+1][14-i+j+1]==0){ // *-**--
-								addcond(&s,incal,cnt,lsp,2,msp);
+								addcond(&s,incal,cnt,lsp,2,msp,nextturn);
 								cnt=incal=rsp=0;
 								lsp=1;
 							}else{ // *-**-?
-								addcond(&s,incal,cnt,lsp,1,msp);
+								addcond(&s,incal,cnt,lsp,1,msp,nextturn);
 								if(frame[j+1][14-i+j+1]==incal){ // *-**-*
 									cnt=cnt-msp;
 									lsp=1;
@@ -495,16 +486,16 @@ BWCORE evaluate(){
 				}else{	// incal!=0, cur!=0 : *x || * x ||  ** ||  *-*
 					if(j==i){
 						if(cur!=incal)
-							addcond(&s,incal,cnt,lsp,rsp,msp);
+							addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						else
-							addcond(&s,incal,cnt+1,lsp,0,msp);
+							addcond(&s,incal,cnt+1,lsp,0,msp,nextturn);
 						continue;
 					}
 					if(incal==cur){
 						cnt++;
 						rsp=0;
 					}else{
-						addcond(&s,incal,cnt,lsp,rsp,msp);
+						addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						incal=cur;
 						lsp=rsp;
 						rsp=0;
@@ -532,7 +523,7 @@ BWCORE evaluate(){
 					incal=cur;// --*
 					cnt=1;
 					if(j==i)
-						addcond(&s,incal,cnt,lsp,0,0);
+						addcond(&s,incal,cnt,lsp,0,0,nextturn);
 				}
 			}else{ // incal!=0
 				if(cur==0){ // -
@@ -543,12 +534,12 @@ BWCORE evaluate(){
 							msp=0;
 						for(k=j;k<=i && !frame[14-i+k][k];++k)
 							rsp++;
-						addcond(&s,incal,cnt,lsp,rsp,msp);
+						addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						cnt=rsp=incal=0;
 						lsp=2;
 					}else{ // last!=0 ***-
 						if(j==i){
-							addcond(&s,incal,cnt,lsp,1,msp);
+							addcond(&s,incal,cnt,lsp,1,msp,nextturn);
 							continue;
 						}
 						if(msp==0){ 
@@ -556,11 +547,11 @@ BWCORE evaluate(){
 							rsp=1;
 						}else{ // msp!=0 && last!=0: *-**-
 							if(frame[14-i+j+1][j+1]==0){ // *-**--
-								addcond(&s,incal,cnt,lsp,2,msp);
+								addcond(&s,incal,cnt,lsp,2,msp,nextturn);
 								cnt=incal=rsp=0;
 								lsp=1;
 							}else{ // *-**-?
-								addcond(&s,incal,cnt,lsp,1,msp);
+								addcond(&s,incal,cnt,lsp,1,msp,nextturn);
 								if(frame[14-i+j+1][j+1]==incal){ // *-**-*
 									cnt=cnt-msp;
 									lsp=1;
@@ -579,16 +570,16 @@ BWCORE evaluate(){
 				}else{	// incal!=0, cur!=0 : *x || * x ||  ** ||  *-*
 					if(j==i){
 						if(cur!=incal)
-							addcond(&s,incal,cnt,lsp,rsp,msp);
+							addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						else
-							addcond(&s,incal,cnt+1,lsp,0,msp);
+							addcond(&s,incal,cnt+1,lsp,0,msp,nextturn);
 						continue;
 					}
 					if(incal==cur){
 						cnt++;
 						rsp=0;
 					}else{
-						addcond(&s,incal,cnt,lsp,rsp,msp);
+						addcond(&s,incal,cnt,lsp,rsp,msp,nextturn);
 						incal=cur;
 						lsp=rsp;
 						rsp=0;
@@ -612,6 +603,7 @@ int getpossible(struct STEP st[MAX_STEP]){
 	if(curstep==0){
 		st[0].x=7;
 		st[0].y=7;
+		st[0].bw=1;
 		return 1;
 	}
 	for(i=0;i<15;++i)
@@ -628,7 +620,7 @@ int getpossible(struct STEP st[MAX_STEP]){
 							find=1;
 							st[n].x=i;
 							st[n].y=j;
-							st[n].bw=(curstep%2)?2:1;
+							st[n].bw=computerbw;//(curstep%2)?2:1;
 							n++;
 							break;
 						}
@@ -641,47 +633,6 @@ int getpossible(struct STEP st[MAX_STEP]){
 	return n;
 }
 
-int checkover(int x, int y){
-if(x==6 && y==9)
-	printf("checkover %d,%d\n",x,y);
-	int i,n;
-	for(n=0,i=x-1;i>=0 && frame[i][y]==frame[x][y] && n<4; i--){
-		n++;
-	}
-	for(i=x+1;i<15 && frame[i][y]==frame[x][y] && n<4; i++){
-		n++;
-	}
-	if (n>=4)
-		return frame[x][y];
-
-	for(i=y-1,n=0;i>=0 && frame[x][i]==frame[x][y] && n<4; i--){
-		n++;
-	}
-	for(i=y+1;i<15 && frame[x][i]==frame[x][y] && n<4; i++){
-		n++;
-	}
-	if(n>=4)
-		return frame[x][y];
-
-    for(i=1,n=0;x-i>=0 && y-i>=0 && frame[x-i][y-i]==frame[x][y] && n<4; i++){
-        n++;
-    }
-    for(i=1;x+i<15 && y+i<15 && frame[x+i][y+i]==frame[x][y] && n<4; i++){
-	}
-	if (n>=4)
-		return frame[x][y];
-
-    for(i=1,n=0;x-i>=0 && y+i<15 && frame[x-i][y+i]==frame[x][y] && n<4; i++){
-        n++;
-    }
-    for(i=1;x+i<15 && y-i>=0 && frame[x+i][y-i]==frame[x][y] && n<4; i++){
-		n++;
-	}
-	if (n>=4)
-		return frame[x][y];
-	
-	return 0;
-}
 
 void applystep(struct STEP st){
 	assert(frame[st.x][st.y]==0);
@@ -692,6 +643,12 @@ void undostep(struct STEP st){
 	frame[st.x][st.y]=0;
 }
 
+struct STEP algol2(){
+	struct STEP ret[MAX_STEP];
+	struct STEP steps[MAX_STEP];
+	
+}
+
 struct STEP algol1(){
 	int nret;
 	struct STEP ret[MAX_STEP];
@@ -700,6 +657,7 @@ struct STEP algol1(){
 	int npos=getpossible(steps);
 	int i;
 	int samecnt=0;
+	int next=computerbw==2?1:2;
 	for(i=0;i<npos;i++){
 		BWCORE sc;
 		sc.bscore=sc.wscore=0;
@@ -707,9 +665,12 @@ struct STEP algol1(){
 		applystep(steps[i]);
 if(steps[i].x==6 && steps[i].y==5)
 	printf("enter watch\n");
-		sc=evaluate();
+		sc=evaluate(next);
 printf("%d,%d: b: %d, w %d\n",steps[i].x,steps[i].y,sc.bscore,sc.wscore);
-		score=sc.wscore-sc.bscore;
+		if(computerbw==2)
+			score=sc.wscore-sc.bscore;
+		else
+			score=sc.bscore-sc.wscore;
 		if(score>max){
 			max=score;
 			ret[0]=steps[i];
@@ -727,56 +688,35 @@ printf("%d,%d: b: %d, w %d\n",steps[i].x,steps[i].y,sc.bscore,sc.wscore);
 	return ret[npos];
 }
 
-void drawtxt(){
-	int i,j;
-	for(i=0;i<15;++i){
-		if(i==0){
-			printf("  ");
-			for(j=0;j<15;++j)
-				printf("%2d",j);
-			printf("\n");
-		}
-		for(j=0;j<15;++j){
-			if(j==0)
-				printf("%-2d",i);
-			if(frame[j][i]==0)
-				printf(" .");
-			else if(frame[j][i]==1)
-				printf(" X");
-			else
-				printf(" O");
-		}
-		printf("\n");
-	}
-}
-
-int main()
-{
-	int you=1;
-	int com=2;
-	struct STEP st;
+void init_robot(int bw,int level){
 	srand(time(NULL));
-	while(1){
-		int x,y;
-redo:
-		printf("your turn: x y --");
-		scanf("%d%d",&x,&y);
-		if(frame[x][y])
-			goto redo;
-		frame[x][y]=you;
-		curstep++;
-//		drawtxt();
-		if(checkover(x,y)){
-			printf("You win!\n");
-			break;
-		}
-
-		st=algol1();
-		curstep++;
-//		drawtxt();
-		if(checkover(st.x,st.y)){
-			printf("computer win!\n");
-			break;
-		}
-	}
+	memset(frame,0,MAX_STEP);
+	computerbw=bw;
+	ailevel=0;//leve;
 }
+
+struct STEP get_step(){
+	struct STEP st;
+	if (ailevel==0)
+		st=algol1();
+	// else st=minmax(ailevel);
+	steplog[curstep++]=st;
+	return st;
+}
+
+void set_step(struct STEP st){
+	frame[st.x][st.y]=st.bw;
+	steplog[curstep++]=st;	
+}
+
+int retreat(){
+	if (curstep>1)
+	{
+		frame[steplog[curstep-1].x][steplog[curstep-1].y]=0;
+		frame[steplog[curstep-2].x][steplog[curstep-2].y]=0;
+		curstep-=2;
+	}
+	return curstep;
+}
+
+
